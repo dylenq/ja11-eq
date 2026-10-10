@@ -57,12 +57,18 @@ public struct FiioReplyFrame: Sendable, Equatable {
     }
 }
 
-/// Builds read requests for the JA11 and locates replies in its input reports.
+/// Builds requests for the JA11, locates replies in its input reports, and decides which frames
+/// may be sent at all.
 ///
-/// This type builds read (GET) requests only. Nothing in it can encode a frame that changes the DAC.
+/// Read (GET) requests exist for the four read commands. Write (SET) frames exist for the five
+/// commands of `JA11WriteCommand` and nothing else: each has its own builder, every builder clamps
+/// its values to the device limits, and the only save builder is for USER1. `isPermittedFrame` is
+/// the allow-list the transport applies before anything reaches the device.
 public enum FiioFrame {
     /// First two bytes of every read request and of every reply.
     static let header: [UInt8] = [0xBB, 0x0B]
+    /// First two bytes of every write frame.
+    static let setHeader: [UInt8] = [0xAA, 0x0A]
     /// Last two bytes of a request, after its data.
     static let terminator: [UInt8] = [0x00, 0xEE]
     /// A reply needs its header, two reserved bytes, command, length and at least one data byte.
@@ -86,7 +92,7 @@ public enum FiioFrame {
     }
 
     /// True only for a payload that is, byte for byte, one of the four read requests in one of the
-    /// two permitted forms. This is the gate the transport applies before anything reaches the device.
+    /// two permitted forms. Together with `isSetRequest` it makes up the transport's gate.
     public static func isGetRequest(_ payload: [UInt8]) -> Bool {
         guard payload.count >= 8, payload.count <= JA11.payloadLength else { return false }
         guard Array(payload[0..<2]) == header, payload[2] == 0x00, payload[3] == 0x00 else { return false }
@@ -103,6 +109,107 @@ public enum FiioFrame {
         guard payload.count == JA11.payloadLength else { return false }    // padded: exactly one full report
         return payload[frameLength...].allSatisfy { $0 == 0x00 }
     }
+
+    // MARK: - Write frames
+
+    /// The write frame for `command` with `data`: always the zero-padded 20-byte form.
+    private static func setFrame(_ command: JA11WriteCommand, data: [UInt8]) -> [UInt8] {
+        precondition(data.count == command.dataLength, "write frame data must be \(command.dataLength) bytes")
+        let frame = setHeader + [0x00, 0x00, command.rawValue, UInt8(command.dataLength)] + data + terminator
+        return frame + [UInt8](repeating: 0x00, count: JA11.payloadLength - frame.count)
+    }
+
+    /// A number as two bytes, high byte first; a negative one in two's complement.
+    private static func bigEndian16(_ value: Int) -> [UInt8] {
+        let bits = UInt16(truncatingIfNeeded: value)
+        return [UInt8(bits >> 8), UInt8(bits & 0xFF)]
+    }
+
+    /// Sets the pre-gain, clamped to the device limit.
+    static func setPreGain(_ dB: Double) -> [UInt8] {
+        setFrame(.preGain, data: bigEndian16(JA11Limits.preGainTenths(dB)))
+    }
+
+    /// Sets the number of filters in use, clamped to 0...5.
+    static func setFilterCount(_ count: Int) -> [UInt8] {
+        setFrame(.filterCount, data: [UInt8(min(max(count, 0), JA11Limits.maxBands))])
+    }
+
+    /// Sets one filter: index, gain, frequency, Q and type, each value clamped to the device limit.
+    ///
+    /// The index has to be one of the device's filter positions and the type one of its three
+    /// shapes; anything else is a programming error, and no frame is built.
+    static func setFilter(_ band: Band) -> [UInt8] {
+        precondition(
+            (0..<JA11Limits.maxBands).contains(band.index),
+            "filter index \(band.index) is outside 0..<\(JA11Limits.maxBands)"
+        )
+        precondition(band.typeID <= maxFilterTypeID, "filter type \(band.typeID) is not one the JA11 offers")
+        let data = [UInt8(band.index)]
+            + bigEndian16(JA11Limits.gainTenths(band.gain))
+            + bigEndian16(JA11Limits.hertz(Double(band.frequency)))
+            + bigEndian16(JA11Limits.qHundredths(band.q))
+            + [band.typeID]
+        return setFrame(.filter, data: data)
+    }
+
+    /// Makes `slot` the active preset.
+    static func selectSlot(_ slot: PresetSlot) -> [UInt8] {
+        setFrame(.presetSlot, data: [slot.rawValue])
+    }
+
+    /// Saves the working values to USER1. There is no builder that saves to any other slot.
+    static func saveToUser1() -> [UInt8] {
+        setFrame(.save, data: [JA11SlotID.user1])
+    }
+
+    /// Highest filter type number the JA11 offers (high shelf).
+    private static let maxFilterTypeID: UInt8 = 2
+
+    /// True only for a write frame this library may send: exactly 20 bytes, the write header, one
+    /// of the five write commands with exactly its data length, a zero byte and the end byte
+    /// straight after the data, zero bytes from there on, and data within the device limits.
+    ///
+    /// Per command: a save names slot 3 and no other; a preset switch names slot 0...4; a filter
+    /// count is 0...5; a pre-gain is within -12...+12 dB; a filter has index 0...4, gain within
+    /// -12...+12 dB, frequency 20...20000 Hz, Q 0.1...10 and type 0...2.
+    public static func isSetRequest(_ payload: [UInt8]) -> Bool {
+        guard payload.count == JA11.payloadLength else { return false }
+        guard Array(payload[0..<2]) == setHeader, payload[2] == 0x00, payload[3] == 0x00 else { return false }
+        guard let command = JA11WriteCommand(rawValue: payload[4]) else { return false }
+        guard Int(payload[5]) == command.dataLength else { return false }
+
+        let dataEnd = 6 + command.dataLength
+        // The byte before the end byte is zero on every write frame; no other value is ever tried there.
+        guard Array(payload[dataEnd..<(dataEnd + terminator.count)]) == terminator else { return false }
+        guard payload[(dataEnd + terminator.count)...].allSatisfy({ $0 == 0x00 }) else { return false }
+
+        let data = Array(payload[6..<dataEnd])
+        let tenths = -120...120
+        switch command {
+        case .save:
+            return data[0] == JA11SlotID.user1
+        case .presetSlot:
+            return PresetSlot(rawValue: data[0]) != nil
+        case .filterCount:
+            return Int(data[0]) <= JA11Limits.maxBands
+        case .preGain:
+            return tenths.contains(int16BE(data[0], data[1]))
+        case .filter:
+            return Int(data[0]) < JA11Limits.maxBands
+                && tenths.contains(int16BE(data[1], data[2]))
+                && JA11Limits.frequencyRange.contains(uint16BE(data[3], data[4]))
+                && (10...1000).contains(uint16BE(data[5], data[6]))
+                && data[7] <= maxFilterTypeID
+        }
+    }
+
+    /// True for every frame the transport may send: a read request or a permitted write frame.
+    public static func isPermittedFrame(_ payload: [UInt8]) -> Bool {
+        isGetRequest(payload) || isSetRequest(payload)
+    }
+
+    // MARK: - Replies
 
     /// Locates a reply in an input report.
     ///

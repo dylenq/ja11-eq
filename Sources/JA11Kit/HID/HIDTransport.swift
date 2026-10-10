@@ -12,7 +12,8 @@ public enum HIDTransportError: Error, Equatable, Sendable, CustomStringConvertib
     case sendFailed(code: Int32)
     /// No JA11 is held open.
     case notConnected
-    /// The payload is not one of the read requests the transport is allowed to send.
+    /// The payload is not one of the frames the transport is allowed to send: a read request, or a
+    /// write frame that `FiioFrame.isPermittedFrame` accepts.
     case refusedFrame
 
     /// Classifies the result of an open call: a refusal by macOS gets its own case.
@@ -34,7 +35,7 @@ public enum HIDTransportError: Error, Equatable, Sendable, CustomStringConvertib
         case .notConnected:
             "The JA11 is not connected."
         case .refusedFrame:
-            "Refused to send a frame that is not a JA11 GET request."
+            "Refused to send a frame that is not a permitted JA11 request."
         }
     }
 
@@ -60,7 +61,8 @@ public protocol ReportTransport: AnyObject, Sendable {
     var reports: AsyncStream<[UInt8]> { get }
     /// Starts looking for the JA11. Later calls do nothing.
     func start()
-    /// Sends one read request, in either permitted form, as an output report on the EQ command channel.
+    /// Sends one permitted frame — a read request or a write frame that passes
+    /// `FiioFrame.isPermittedFrame` — as an output report on the EQ command channel.
     func send(_ payload: [UInt8]) throws
 }
 
@@ -138,8 +140,9 @@ public final class HIDTransport: ReportTransport, @unchecked Sendable {
     }
 
     public func send(_ payload: [UInt8]) throws {
-        // The gate: nothing but a read request ever reaches the device.
-        guard FiioFrame.isGetRequest(payload) else { throw HIDTransportError.refusedFrame }
+        // The gate: an explicit allow-list. Read requests, and write frames for USER1 with values
+        // inside the device limits; everything else stops here, before IOKit.
+        guard FiioFrame.isPermittedFrame(payload) else { throw HIDTransportError.refusedFrame }
 
         // macOS expects the report-ID byte first for a device with numbered reports.
         let buffer = [JA11.reportID] + payload

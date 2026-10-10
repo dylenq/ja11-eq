@@ -1,4 +1,4 @@
-/// Why a read from the JA11 did not produce a value.
+/// Why a read from, or a write to, the JA11 did not produce a result.
 public enum JA11Error: Error, Equatable, Sendable, CustomStringConvertible {
     /// No JA11 showed up within the discovery timeout.
     case notFound
@@ -14,6 +14,10 @@ public enum JA11Error: Error, Equatable, Sendable, CustomStringConvertible {
     case unexpectedReply(String)
     /// The transport reported an error.
     case transport(HIDTransportError)
+    /// A write sequence was ended before its save. The text says what was and was not sent.
+    case writeInterrupted(String)
+    /// The save was sent but no state could be read back afterwards, so nothing is confirmed.
+    case noReadBack(String)
 
     public var description: String {
         switch self {
@@ -31,7 +35,52 @@ public enum JA11Error: Error, Equatable, Sendable, CustomStringConvertible {
             "Unexpected reply from the JA11: \(text)"
         case .transport(let error):
             error.description
+        case .writeInterrupted(let text):
+            "The write was interrupted: \(text)"
+        case .noReadBack(let text):
+            "No read-back from the JA11: \(text)"
         }
+    }
+}
+
+/// A change of the link seen after a save was sent.
+public struct LinkEvent: Sendable, Equatable {
+    public enum Kind: Sendable, Equatable {
+        case disconnected
+        case connected
+    }
+
+    public let kind: Kind
+    /// Time between the save frame and this change.
+    public let secondsAfterSave: Double
+
+    public init(kind: Kind, secondsAfterSave: Double) {
+        self.kind = kind
+        self.secondsAfterSave = secondsAfterSave
+    }
+}
+
+/// The outcome of an apply: what was sent, what the device reported afterwards, and how they differ.
+public struct ApplyReport: Sendable, Equatable {
+    /// The state that was sent, clamped and at wire resolution.
+    public let sent: EQState
+    /// The state read from the device after the save.
+    public let readBack: EQState
+    /// One line per value that reads back differently; empty when everything matches.
+    public let differences: [String]
+    /// Disconnects and connects seen between the save and the end of the apply.
+    public let linkEvents: [LinkEvent]
+
+    public init(sent: EQState, readBack: EQState, differences: [String], linkEvents: [LinkEvent]) {
+        self.sent = sent
+        self.readBack = readBack
+        self.differences = differences
+        self.linkEvents = linkEvents
+    }
+
+    /// True only when the state read back from the device equals what was sent.
+    public var isConfirmed: Bool {
+        differences.isEmpty
     }
 }
 
@@ -55,10 +104,11 @@ public enum LinkUpdate: Sendable, Equatable {
     case openFailed(HIDTransportError)
 }
 
-/// Reads the JA11's EQ state over a `ReportTransport`.
+/// Reads the JA11's EQ state over a `ReportTransport`, and writes a curve to its USER1 slot.
 ///
-/// The actor offers read operations only: every frame it builds is a read request, and nothing
-/// here changes what is stored on the device.
+/// Reads build read requests only. The one write operation, `apply(_:)`, takes every frame from a
+/// `FiioFrame` builder, saves to USER1 and to no other slot, and reports success only for a state
+/// read back from the device after the save.
 public actor JA11Device {
     /// The request that is waiting for its reply.
     private struct PendingRequest {
@@ -71,6 +121,12 @@ public actor JA11Device {
     private let transport: any ReportTransport
     private let replyTimeout: Duration
     private let discoveryTimeout: Duration
+    /// Pause after each write frame.
+    private let framePause: Duration
+    /// Wait between the save and the first attempt to read back.
+    private let saveSettle: Duration
+    /// How long after the save a read-back may still arrive; the device may drop off USB meanwhile.
+    private let reconnectTimeout: Duration
     private let trace: (@Sendable (FrameDirection, [UInt8]) -> Void)?
 
     private var started = false
@@ -87,6 +143,8 @@ public actor JA11Device {
 
     /// Counts connects, so a read can tell that the dongle it began with is the one it ended with.
     private var connectionEpoch: UInt64 = 0
+    /// Link changes since the save of the apply under way; nil while no apply is past its save.
+    private var linkLog: (savedAt: ContinuousClock.Instant, events: [LinkEvent])?
     /// Where `watch()` receives link changes; nil while nobody is watching.
     private var watcher: (id: UInt64, continuation: AsyncStream<ConnectionEvent>.Continuation)?
 
@@ -97,11 +155,17 @@ public actor JA11Device {
         transport: any ReportTransport,
         replyTimeout: Duration = .seconds(1),
         discoveryTimeout: Duration = .seconds(2),
+        framePause: Duration = .milliseconds(100),
+        saveSettle: Duration = .milliseconds(1500),
+        reconnectTimeout: Duration = .seconds(10),
         trace: (@Sendable (FrameDirection, [UInt8]) -> Void)? = nil
     ) {
         self.transport = transport
         self.replyTimeout = replyTimeout
         self.discoveryTimeout = discoveryTimeout
+        self.framePause = framePause
+        self.saveSettle = saveSettle
+        self.reconnectTimeout = reconnectTimeout
         self.trace = trace
     }
 
@@ -210,6 +274,76 @@ public actor JA11Device {
         }
         guard epoch == connectionEpoch else { throw JA11Error.disconnected }
         return EQState(slotID: slotID, preGain: preGain, bands: bands)
+    }
+
+    // MARK: - Writing
+
+    /// Writes `curve` to USER1 and reads the device back.
+    ///
+    /// The curve is clamped first. USER1 is made the active slot, and seen to be, before any value
+    /// is sent, so a filter write can never land in a factory preset's working copy. Then, in this
+    /// order: pre-gain, filter count 5, filters 0 to 4, save to USER1, select USER1 — and a read of
+    /// the whole state. The report is confirmed only when that read equals what was sent.
+    ///
+    /// Throws `.writeInterrupted` when the device did not switch to USER1 (nothing was written
+    /// then), and `.noReadBack` when no read completed within the reconnect timeout after the save.
+    func apply(_ curve: EQCurve) async throws -> ApplyReport {
+        let sent = curve.clamped().deviceState()
+
+        if try await readSlot() != JA11SlotID.user1 {
+            try await sendWrite(FiioFrame.selectSlot(.user1))
+            guard try await readSlot() == JA11SlotID.user1 else {
+                throw JA11Error.writeInterrupted("the JA11 did not switch to USER1; nothing was written.")
+            }
+        }
+
+        try await sendWrite(FiioFrame.setPreGain(sent.preGain))
+        try await sendWrite(FiioFrame.setFilterCount(JA11Limits.maxBands))
+        for band in sent.bands {
+            try await sendWrite(FiioFrame.setFilter(band))
+        }
+
+        let clock = ContinuousClock()
+        let savedAt = clock.now
+        linkLog = (savedAt, [])
+        defer { linkLog = nil }
+        try await sendWrite(FiioFrame.saveToUser1())
+        try await Task.sleep(for: saveSettle)
+
+        // The device may be away for a while after a save. Until the deadline, each attempt
+        // selects USER1 and reads everything; the save itself and the values are never sent again.
+        let deadline = savedAt + reconnectTimeout
+        var lastFailure = "no attempt was made"
+        while clock.now < deadline {
+            do {
+                try await sendWrite(FiioFrame.selectSlot(.user1))
+                let readBack = try await readState()
+                return ApplyReport(
+                    sent: sent,
+                    readBack: readBack,
+                    differences: readBack.differences(from: sent),
+                    linkEvents: linkLog?.events ?? []
+                )
+            } catch let error as JA11Error {
+                lastFailure = error.description
+                try await Task.sleep(for: max(framePause, .milliseconds(10)))
+            }
+        }
+        throw JA11Error.noReadBack(
+            "the save was sent, but no state could be read within \(reconnectTimeout) after it. Last attempt: \(lastFailure)"
+        )
+    }
+
+    /// Hands one write frame to the transport, then pauses. Write frames are not answered.
+    private func sendWrite(_ frame: [UInt8]) async throws {
+        guard connected else { throw JA11Error.notConnected }
+        trace?(.sent, frame)
+        do {
+            try transport.send(frame)
+        } catch let error as HIDTransportError {
+            throw JA11Error.transport(error)
+        }
+        try await Task.sleep(for: framePause)
     }
 
     // MARK: - Watching
@@ -352,6 +486,7 @@ public actor JA11Device {
 
     private func handle(event: ConnectionEvent) {
         defer { watcher?.continuation.yield(event) }
+        recordForApply(event)
         switch event {
         case .connected:
             connected = true
@@ -368,6 +503,20 @@ public actor JA11Device {
             lastOpenError = error
             resumeConnectionWaiters(with: .failure(JA11Error.transport(error)))
         }
+    }
+
+    /// Notes a connect or disconnect for the apply that is past its save, if there is one.
+    private func recordForApply(_ event: ConnectionEvent) {
+        guard let log = linkLog else { return }
+        let kind: LinkEvent.Kind
+        switch event {
+        case .connected: kind = .connected
+        case .disconnected: kind = .disconnected
+        case .openFailed: return
+        }
+        let elapsed = ContinuousClock.now - log.savedAt
+        let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        linkLog?.events.append(LinkEvent(kind: kind, secondsAfterSave: seconds))
     }
 
     private func handle(report: [UInt8]) {
