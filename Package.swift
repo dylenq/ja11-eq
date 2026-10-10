@@ -7,10 +7,12 @@ let package = Package(
     products: [
         .library(name: "JA11Kit", targets: ["JA11Kit"]),
         .executable(name: "ja11-probe", targets: ["ja11-probe"]),
+        .executable(name: "ja11-eq", targets: ["ja11-eq"]),
     ],
     targets: [
         .target(name: "JA11Kit"),
         .executableTarget(name: "ja11-probe", dependencies: ["JA11Kit"]),
+        .executableTarget(name: "ja11-eq", dependencies: ["JA11Kit"]),
         .testTarget(name: "JA11KitTests", dependencies: ["JA11Kit"]),
     ]
 )
