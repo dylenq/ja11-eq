@@ -55,7 +55,7 @@ If macOS refuses access to the dongle, the app shows "Access refused". Open Syst
 
 Build them with `swift build`. Run them with `swift run ja11-probe` or `swift run ja11-eq`, or directly from `"$(swift build --show-bin-path)"`.
 
-`ja11-probe` only reads the dongle and prints its state:
+`ja11-probe` only reads the dongle and prints its state (`ja11-probe --watch` keeps running and follows plugging and unplugging):
 
 ```
 ja11-probe [--watch] [--raw]
