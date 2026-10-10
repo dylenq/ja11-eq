@@ -11,8 +11,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **LINK-01**: The JA11 (VID `0x2972`, PID `0x0102`) is found automatically when it is connected, with no manual selection
 - [ ] **LINK-02**: Connection status follows the dongle being unplugged and plugged back in, without restarting
-- [ ] **LINK-03**: The DAC's active preset slot, pre-gain and all filter settings can be read from the device
-- [ ] **LINK-04**: A `ja11-probe` command prints the DAC's current slot, pre-gain and filters without changing anything on the device
+- [x] **LINK-03**: The DAC's active preset slot, pre-gain and all filter settings can be read from the device
+- [x] **LINK-04**: A `ja11-probe` command prints the DAC's current slot, pre-gain and filters without changing anything on the device
 - [ ] **LINK-05**: The dongle's volume and play/pause buttons keep working while the device is open
 - [ ] **LINK-06**: If macOS refuses access to the device, the user is told which permission to grant and where
 
@@ -90,8 +90,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | LINK-01 | Phase 1 | Complete |
 | LINK-02 | Phase 1 | Pending |
-| LINK-03 | Phase 1 | Pending |
-| LINK-04 | Phase 1 | Pending |
+| LINK-03 | Phase 1 | Complete |
+| LINK-04 | Phase 1 | Complete |
 | LINK-05 | Phase 1 | Pending |
 | LINK-06 | Phase 1 | Pending |
 | WRITE-01 | Phase 2 | Pending |

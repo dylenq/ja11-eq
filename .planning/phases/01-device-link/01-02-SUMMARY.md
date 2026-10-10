@@ -215,6 +215,8 @@ All four commands were answered, each by the report that followed its request:
 4. **Permission (LINK-06, D-10).** Open System Settings → Privacy & Security → Input Monitoring. Recall whether macOS ever showed a permission prompt while the probe ran. If the app that runs the probe (the terminal, or Claude) has an entry there that is switched on, switch it off, run `ja11-probe`, then switch it back on (the app may need reopening).
    Expected: if macOS requires the permission, with the entry off the probe prints a message naming Input Monitoring and that settings path and exits with status 3, and with it back on it reads the state again. If there is no entry and no prompt ever appeared, or the probe still reads with the entry off, macOS does not require the permission, which matches (c) above.
 
+**Requirement status.** `requirements-completed` in the frontmatter repeats the plan's list, as the template requires. In `REQUIREMENTS.md` only LINK-03 and LINK-04 were marked complete after this plan. LINK-02, LINK-05 and LINK-06 were left pending on purpose: each depends on one of the checks above.
+
 ## Task Commits
 
 1. **Task 1, tests** - `b89bc9d` (test)

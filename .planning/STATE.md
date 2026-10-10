@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Device Link
-status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-10-10T10:26:57.760Z"
+status: verifying
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-10-10T13:30:12.440Z"
 last_activity: 2026-10-10
 last_activity_desc: Phase 01 execution started
-state_head: b836eba877296149e7a67f03153644fc9a7a80f6
+state_head: 1067674aff0ac02e9d790a3f91bc1ece06241fd7
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 
 Phase: 01 (Device Link) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-10 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01 | 14 min | 2 tasks | 9 files |
+| Phase 01 P02 | 6 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,9 @@ Recent decisions affecting current work:
 - [Phase 01]: The JA11 answers GET requests in the padded 20-byte form; input reports are 21 bytes with a leading report-ID byte (headerOffset 1); no Input Monitoring refusal was seen
 - [Phase 01]: The transport send gate accepts only the eight D-03 reference request shapes (exact data length per command); Phase 2 must replace the gate deliberately to add writes
 - [Phase 01]: readFilter(index:) traps outside 0..<5 rather than sending a request for a filter the device does not have; a filter count above 5 ends readState before any filter request
+- [Phase 01]: readState ends with disconnected when the dongle was replugged during the read, so one state never combines values from two connections
+- [Phase 01]: JA11Device.watch() supports one watcher and runs a fresh read on every connect; ja11-probe exit statuses are 0 state printed, 1 no JA11, 2 usage error, 3 access refused, 4 read failed
+- [Phase 01]: On the real JA11, Input Monitoring status was unknown while open and reads succeeded: no grant was needed for the probe as launched from Claude Code. A refusal was never seen; unplug/replug, buttons and the permission check await human verification
 
 ### Pending Todos
 
@@ -100,6 +104,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-10T10:26:32.951Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-10-10T13:30:12.428Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
