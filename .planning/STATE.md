@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: EQ Engine and Write Path
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-10-10T15:50:22.137Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-10-10T15:55:29.126Z"
 last_activity: 2026-10-10
 last_activity_desc: Phase 02 execution started
-state_head: 33fd770089b2acade90a534c59a0807a9e5e26ad
+state_head: 93ee15a585fad07bc830000725077136b94b7c64
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 ## Current Position
 
 Phase: 02 (EQ Engine and Write Path) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-10-10 — Phase 02 execution started
 
@@ -60,6 +60,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 01 P02 | 6 min | 3 tasks | 4 files |
 | Phase 02 P01 | 9 min | 3 tasks | 11 files |
 | Phase 02 P02 | 9 min | 2 tasks | 9 files |
+| Phase 02 P03 | 3 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,9 @@ Recent decisions affecting current work:
 - [Phase 02]: captureUser1 re-selects the slot that was active and requires the read-back to match, beyond the letter of D-13; a backup from USER1 sends no write frame
 - [Phase 02]: The backup file is written once through a temporary file and link(2); nothing in BackupStore replaces, changes or deletes an existing file, and an unreadable file stops every write
 - [Phase 02]: JA11Writer is the only public way to write; apply, applyTestCurve and selectSlot take the backup first, and an unconfirmed restore sends nothing further
+- [Phase 02]: ja11-eq checks arguments, the curve file and the backup file before a transport exists; an unreadable backup or a restore without one exits 6 without opening the device
+- [Phase 02]: ja11-eq exit statuses: 0 confirmed, 1 no JA11, 2 usage error or unreadable curve file, 3 access refused, 4 device operation failed, 5 read-back mismatch, 6 backup problem; backup prints no result line and sent: lines appear only when an operation returned a report
+- [Phase 02]: A curve file is refused when it is not a regular file, exceeds 64 KB, does not decode or holds more than five bands; the device part of ja11-eq was compiled but not run before plan 02-04
 
 ### Pending Todos
 
@@ -116,6 +120,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-10T15:50:22.121Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-10-10T15:55:29.109Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
