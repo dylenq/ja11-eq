@@ -31,7 +31,7 @@ Phase 1 facts this phase builds on: the JA11 answers GET requests in the zero-pa
 - **D-08:** Auto pre-gain = −max(0, peak of the combined band response over 20 Hz–20 kHz on a log grid of at least 512 points), rounded down to 0.1 dB, clamped to −12…0 dB.
 
 ### Apply, verify, recover
-- **D-09:** Apply order: pre-gain → filter count → each filter 0…4 → save to slot 3 → select slot 3, with a short pause (about 100 ms) between frames as the reference implementation does.
+- **D-09:** Apply order: select slot 3 first if it is not already the active slot (confirmed by read-back, so filter writes can never land in a factory preset's working copy) → pre-gain → filter count → each filter 0…4 → save to slot 3 → select slot 3, with a short pause (about 100 ms) between frames as the reference implementation does.
 - **D-10:** After the save, wait for the device to be usable again (it may drop off USB and re-enumerate; allow up to about 10 s), then read the state back and compare with what was sent at wire resolution. A mismatch, or no read-back, is reported as a failure — never as success.
 - **D-11:** Only slot 3 (USER1) is ever saved to. The library offers no way to save to another slot.
 - **D-12:** Preset switching between Vocal (0), Classic (1), Bass (2), USER1 (3) and Off (4) is a separate operation, confirmed by reading the slot back.
