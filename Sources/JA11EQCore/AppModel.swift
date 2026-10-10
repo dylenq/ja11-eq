@@ -191,6 +191,121 @@ public final class AppModel {
         finishOperation()
     }
 
+    // MARK: - Presets
+
+    /// Switches the DAC to `choice` and loads what it then reports. With unsaved edits it asks first.
+    public func selectPreset(_ choice: PresetChoice) async {
+        guard canSelectPreset, activePreset != choice else { return }
+        if editor.isDirty {
+            pendingPreset = choice
+            return
+        }
+        await performSwitch(to: choice)
+    }
+
+    public func confirmPendingPreset() async {
+        guard let choice = pendingPreset else { return }
+        pendingPreset = nil
+        guard canSelectPreset else { return }
+        await performSwitch(to: choice)
+    }
+
+    public func cancelPendingPreset() {
+        pendingPreset = nil
+    }
+
+    private func performSwitch(to choice: PresetChoice) async {
+        begin(.switchingPreset)
+        await waitForQuietLink()
+        do {
+            let report = try await retryingBusy { try await writer.selectSlot(choice.slot) }
+            // The header and editor always show the slot the DAC reports, never the one requested.
+            let state = try await device.readState()
+            showState(state)
+            if report.isConfirmed {
+                outcome = .info("Switched to \(choice.title)")
+            } else {
+                outcome = .failed(
+                    "The JA11 did not switch to \(choice.title); it still reports \(Self.slotDescription(report.readSlotID))."
+                )
+            }
+        } catch {
+            outcome = .failed(Self.describe(error))
+        }
+        finishOperation()
+    }
+
+    // MARK: - Revert and restore
+
+    /// Discards the edits and reloads the DAC's state by reading it.
+    public func revert() async {
+        guard canRevert else { return }
+        begin(.reloading)
+        await waitForQuietLink()
+        do {
+            showState(try await device.readState())
+        } catch {
+            editor.revert()
+            outcome = .failed(
+                "Could not read the JA11 (\(Self.describe(error))); the edits were reverted to the last known values."
+            )
+        }
+        finishOperation()
+    }
+
+    public func requestRestore() {
+        guard canRestore else { return }
+        restoreConfirmationPending = true
+    }
+
+    public func cancelRestore() {
+        restoreConfirmationPending = false
+    }
+
+    /// Writes the backed-up original curve back to USER1 through the writer.
+    public func confirmRestore() async {
+        guard restoreConfirmationPending else { return }
+        restoreConfirmationPending = false
+        guard canRestore else { return }
+        begin(.restoring)
+        await waitForQuietLink()
+        do {
+            // No busy retry: the later steps of a restore must not be repeated.
+            let report = try await writer.restore()
+            showState(try await device.readState())
+            if report.isConfirmed {
+                outcome = .confirmed("Original USER1 restored and confirmed")
+            } else if !report.apply.isConfirmed {
+                outcome = .mismatch(report.apply.differences)
+            } else {
+                outcome = .failed(
+                    "The original curve was restored, but the JA11 reports \(Self.slotDescription(report.finalSlotID)) instead of \(Self.slotDescription(report.expectedSlotID))."
+                )
+            }
+        } catch {
+            outcome = .failed(Self.describe(error))
+        }
+        finishOperation()
+    }
+
+    /// Shows a state read by an operation, replacing the editor whatever it held.
+    private func showState(_ state: EQState) {
+        deviceState = state
+        readFailure = nil
+        guard let curve = EQCurve(state: state) else {
+            editor = .empty
+            readFailure = Self.unshowableReason(state)
+            return
+        }
+        editor.load(curve, editable: PresetChoice(slotID: state.slotID)?.isEditable == true)
+        reconnectSeen = false
+    }
+
+    private static func slotDescription(_ id: UInt8) -> String {
+        guard let choice = PresetChoice(slotID: id) else { return "slot \(id)" }
+        return choice == .custom ? "Custom (USER1, slot \(id))" : "\(choice.title) (slot \(id))"
+    }
+
     func begin(_ state: OperationState) {
         operation = state
         outcome = nil
@@ -231,7 +346,8 @@ public final class AppModel {
     }
 
     static func describe(_ error: any Error) -> String {
-        if let text = error as? any CustomStringConvertible { return text.description }
+        if let error = error as? JA11Error { return error.description }
+        if let error = error as? BackupError { return error.description }
         return error.localizedDescription
     }
 

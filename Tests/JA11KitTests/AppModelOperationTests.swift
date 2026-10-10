@@ -43,6 +43,16 @@ struct OperationFixture {
         model.stop()
     }
 
+    /// Makes every read request take 4 ms, so a read that follows a connect is still under way
+    /// when the test starts its operation.
+    static func slowReads(_ dongle: FakeDongle) {
+        let base = dongle.transport.responder
+        dongle.transport.responder = { payload in
+            if FiioFrame.isGetRequest(payload) { Thread.sleep(forTimeInterval: 0.004) }
+            return base(payload)
+        }
+    }
+
     /// Writes `text` where the backup file would be.
     func plantBackupFile(_ text: String) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -262,10 +272,12 @@ struct OperationFixture {
     @Test func anOperationStartedDuringAConnectWaitsForTheWatchLoopsRead() async throws {
         try await OperationFixture.with { f in
             let readsBefore = f.dongle.transport.sent.count
+            let logBefore = f.model.statusLog.count
+            OperationFixture.slowReads(f.dongle)
             f.dongle.transport.emit(.disconnected)
             f.dongle.transport.emit(.connected)
             f.model.editor.setGain(-3, band: 1)
-            await waitUntil("reconnected") { f.model.connection == .connected }
+            await waitUntil("drop and return seen") { f.model.statusLog.count >= logBefore + 2 }
 
             await f.model.apply()
 
