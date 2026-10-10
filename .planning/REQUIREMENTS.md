@@ -33,13 +33,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **APP-01**: User sees whether the DAC is connected and which preset is active
 - [ ] **APP-02**: User can switch preset from a picker: Vocal / Classic / Bass / Custom / Off
-- [ ] **APP-03**: User can set each band's type (peak, low shelf, high shelf), frequency, gain and Q
-- [ ] **APP-04**: User can turn each band on or off
-- [ ] **APP-05**: User sees a frequency response graph (20 Hz–20 kHz, log scale) that updates as the curve is edited
-- [ ] **APP-06**: User can drag a band's handle on the graph to change its frequency and gain
-- [ ] **APP-07**: User can set pre-gain by hand, or switch on Auto so it follows the curve
+- [x] **APP-03**: User can set each band's type (peak, low shelf, high shelf), frequency, gain and Q
+- [x] **APP-04**: User can turn each band on or off
+- [x] **APP-05**: User sees a frequency response graph (20 Hz–20 kHz, log scale) that updates as the curve is edited
+- [x] **APP-06**: User can drag a band's handle on the graph to change its frequency and gain
+- [x] **APP-07**: User can set pre-gain by hand, or switch on Auto so it follows the curve
 - [ ] **APP-08**: User can press Apply to send the curve to the DAC, and sees whether it was confirmed
-- [ ] **APP-09**: When the DAC connects, the editor loads the curve currently stored on it
+- [x] **APP-09**: When the DAC connects, the editor loads the curve currently stored on it
 - [x] **APP-10**: User sees the DAC's current output sample rate
 
 ### Packaging
@@ -106,13 +106,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WRITE-10 | Phase 2 | Complete |
 | APP-01 | Phase 3 | Complete |
 | APP-02 | Phase 3 | Pending |
-| APP-03 | Phase 3 | Pending |
-| APP-04 | Phase 3 | Pending |
-| APP-05 | Phase 3 | Pending |
-| APP-06 | Phase 3 | Pending |
-| APP-07 | Phase 3 | Pending |
+| APP-03 | Phase 3 | Complete |
+| APP-04 | Phase 3 | Complete |
+| APP-05 | Phase 3 | Complete |
+| APP-06 | Phase 3 | Complete |
+| APP-07 | Phase 3 | Complete |
 | APP-08 | Phase 3 | Pending |
-| APP-09 | Phase 3 | Pending |
+| APP-09 | Phase 3 | Complete |
 | APP-10 | Phase 3 | Complete |
 | PKG-01 | Phase 4 | Pending |
 | PKG-02 | Phase 4 | Pending |
