@@ -23,17 +23,32 @@ public struct FiioReplyFrame: Sendable, Equatable {
 
     /// The number of filters in use, when this is a reply to the filter-count request.
     public func filterCount() -> Int? {
-        nil  // RED stub: replaced in the implementation commit
+        guard command == JA11Command.filterCount.rawValue, let count = byte(at: 6) else { return nil }
+        return Int(count)
     }
 
     /// The pre-gain in dB, when this is a reply to the pre-gain request.
+    ///
+    /// Frame bytes 6 and 7 hold dB × 10 as a signed big-endian number.
     public func preGain() -> Double? {
-        nil  // RED stub: replaced in the implementation commit
+        guard command == JA11Command.preGain.rawValue, bytes.count >= 8 else { return nil }
+        return Double(FiioFrame.int16BE(bytes[6], bytes[7])) / 10
     }
 
     /// The filter this reply describes, when this is a reply to a filter request.
+    ///
+    /// Frame byte 6 is the index, 7–8 the gain (dB × 10, signed), 9–10 the frequency in Hz,
+    /// 11–12 Q × 100 and 13 the type. Every value is passed on as received: a Q of 0 stays 0 and
+    /// an unknown type number stays that number.
     public func band() -> Band? {
-        nil  // RED stub: replaced in the implementation commit
+        guard command == JA11Command.filter.rawValue, bytes.count >= 14 else { return nil }
+        return Band(
+            index: Int(bytes[6]),
+            typeID: bytes[13],
+            frequency: FiioFrame.uint16BE(bytes[9], bytes[10]),
+            gain: Double(FiioFrame.int16BE(bytes[7], bytes[8])) / 10,
+            q: Double(FiioFrame.uint16BE(bytes[11], bytes[12])) / 100
+        )
     }
 
     /// One frame byte, or nil when the frame is too short to hold it.
@@ -106,12 +121,12 @@ public enum FiioFrame {
 
     /// Two bytes, high byte first, as a signed 16-bit number (two's complement).
     public static func int16BE(_ high: UInt8, _ low: UInt8) -> Int {
-        0  // RED stub: replaced in the implementation commit
+        Int(Int16(bitPattern: UInt16(high) << 8 | UInt16(low)))
     }
 
     /// Two bytes, high byte first, as an unsigned 16-bit number.
     public static func uint16BE(_ high: UInt8, _ low: UInt8) -> Int {
-        0  // RED stub: replaced in the implementation commit
+        Int(UInt16(high) << 8 | UInt16(low))
     }
 
     /// Bytes as two-digit lowercase hex separated by single spaces, e.g. `bb 0b 00`.

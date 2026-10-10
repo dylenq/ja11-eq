@@ -26,8 +26,10 @@ do {
     await device.start()
     try await device.waitForConnection()
 
-    let slot = try await device.readSlot()
-    print("slot: \(slot)")
+    let state = try await device.readState()
+    for line in state.reportLines() {
+        print(line)
+    }
 
     if raw, let form = await device.frameForm {
         print("info: request frame form: \(form.rawValue)")

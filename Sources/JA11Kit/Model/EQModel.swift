@@ -10,7 +10,13 @@ public enum PresetSlot: UInt8, CaseIterable, Sendable {
 
     /// Name shown to the user.
     public var displayName: String {
-        ""  // RED stub: replaced in the implementation commit
+        switch self {
+        case .vocal: "Vocal"
+        case .classic: "Classic"
+        case .bass: "Bass"
+        case .user1: "USER1"
+        case .off: "Off"
+        }
     }
 }
 
@@ -22,7 +28,11 @@ public enum FilterType: UInt8, CaseIterable, Sendable {
 
     /// Name shown to the user.
     public var displayName: String {
-        ""  // RED stub: replaced in the implementation commit
+        switch self {
+        case .peak: "peak"
+        case .lowShelf: "low-shelf"
+        case .highShelf: "high-shelf"
+        }
     }
 }
 
@@ -41,7 +51,7 @@ public struct Band: Sendable, Equatable {
 
     /// The filter type, or nil when the device sent a number this table does not know.
     public var type: FilterType? {
-        nil  // RED stub: replaced in the implementation commit
+        FilterType(rawValue: typeID)
     }
 
     public init(index: Int, typeID: UInt8, frequency: Int, gain: Double, q: Double) {
@@ -64,7 +74,7 @@ public struct EQState: Sendable, Equatable {
 
     /// The active preset slot, or nil when the device sent a number this table does not know.
     public var slot: PresetSlot? {
-        nil  // RED stub: replaced in the implementation commit
+        PresetSlot(rawValue: slotID)
     }
 
     public init(slotID: UInt8, preGain: Double, bands: [Band]) {
@@ -74,7 +84,25 @@ public struct EQState: Sendable, Equatable {
     }
 
     /// The state as the lines `ja11-probe` prints.
+    ///
+    /// A slot or filter type the tables do not know stays visible as its number. Numbers are
+    /// formatted without a locale, so the decimal separator is always a dot.
     public func reportLines() -> [String] {
-        []  // RED stub: replaced in the implementation commit
+        var lines = [
+            "slot: \(slotID) (\(slot?.displayName ?? "unknown"))",
+            "pre-gain: \(Self.decibels(preGain)) dB",
+            "filters: \(bands.count)",
+        ]
+        for band in bands {
+            let type = band.type?.displayName ?? "type-\(band.typeID)"
+            let q = String(format: "%.2f", band.q)
+            lines.append("filter \(band.index): \(type) \(band.frequency) Hz \(Self.decibels(band.gain)) dB Q \(q)")
+        }
+        return lines
+    }
+
+    /// A gain with its sign and one decimal: `+6.0`, `-3.5`, `+0.0`.
+    private static func decibels(_ value: Double) -> String {
+        String(format: "%+.1f", value)
     }
 }

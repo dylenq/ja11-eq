@@ -134,6 +134,60 @@ public actor JA11Device {
         return slot
     }
 
+    /// The number of filters in use as the device reports it.
+    public func readFilterCount() async throws -> Int {
+        let reply = try await request(.filterCount)
+        guard let count = reply.filterCount() else { throw undecodable(.filterCount, reply) }
+        return count
+    }
+
+    /// The pre-gain in dB as the device reports it.
+    public func readPreGain() async throws -> Double {
+        let reply = try await request(.preGain)
+        guard let preGain = reply.preGain() else { throw undecodable(.preGain, reply) }
+        return preGain
+    }
+
+    /// The filter at `index` as the device reports it.
+    ///
+    /// A filter reply that describes another index is not taken as the answer. `index` has to be
+    /// one of the device's filter positions; asking for any other is a programming error, and
+    /// nothing is sent.
+    public func readFilter(index: Int) async throws -> Band {
+        precondition(
+            (0..<JA11Limits.maxBands).contains(index),
+            "filter index \(index) is outside 0..<\(JA11Limits.maxBands)"
+        )
+        let reply = try await request(.filter, data: [UInt8(index)]) { reply in
+            // A reply too short to decode is let through, so it is reported instead of timing out.
+            guard let band = reply.band() else { return true }
+            return band.index == index
+        }
+        guard let band = reply.band() else { throw undecodable(.filter, reply) }
+        return band
+    }
+
+    /// The whole EQ state: slot, filter count, pre-gain, then every filter in index order.
+    ///
+    /// Each request is answered before the next one is sent. Any error ends the read: the result
+    /// is either everything the device reported or nothing.
+    public func readState() async throws -> EQState {
+        let slotID = try await readSlot()
+
+        let count = try await readFilterCount()
+        guard count <= JA11Limits.maxBands else {
+            throw JA11Error.unexpectedReply("filter count \(count) exceeds the device limit of \(JA11Limits.maxBands)")
+        }
+
+        let preGain = try await readPreGain()
+
+        var bands: [Band] = []
+        for index in 0..<count {
+            bands.append(try await readFilter(index: index))
+        }
+        return EQState(slotID: slotID, preGain: preGain, bands: bands)
+    }
+
     // MARK: - Requests
 
     /// Sends one read request and returns the reply that answers it.
