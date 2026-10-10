@@ -21,5 +21,11 @@ struct JA11EQApp: App {
                     model.start()
                 }
         }
+        .commands {
+            CommandMenu("Device") {
+                Button("Restore Original...") { model.requestRestore() }
+                    .disabled(!model.canRestore)
+            }
+        }
     }
 }

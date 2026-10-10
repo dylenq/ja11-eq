@@ -12,6 +12,8 @@ struct ContentView: View {
             GraphView(model: model)
                 .frame(maxHeight: .infinity)
             EditorPanelView(model: model)
+            Divider()
+            ApplyBarView(model: model)
         }
         .padding(20)
     }
@@ -24,6 +26,8 @@ struct ContentView: View {
                     .frame(width: 10, height: 10)
                 Text(model.connection.title)
                     .font(.headline)
+                Spacer()
+                PresetPickerView(model: model)
             }
             if let detail = model.connection.detail {
                 Text(detail).foregroundStyle(.secondary)
