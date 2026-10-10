@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 2
+current_phase: 02
 current_phase_name: EQ Engine and Write Path
 status: executing
-stopped_at: Phase 01 complete, ready to plan Phase 2
-last_updated: "2026-10-10T15:26:44.683Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-10-10T15:38:09.256Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 01 complete, transitioned to Phase 2
-state_head: cbbf4c3396f54526e1df2ce33cb999f096731fe4
+last_activity_desc: Phase 02 execution started
+state_head: f927ef926844dab17468086c32cdbd88cfbce7b6
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 6
-  completed_plans: 2
+  completed_plans: 3
   percent: 25
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-10)
 
 **Core value:** Edit an EQ curve on the Mac, press Apply, and the JA11 plays with that curve — reliably, and without ever damaging the dongle's factory presets.
-**Current focus:** Phase 01 — Device Link
+**Current focus:** Phase 02 — EQ Engine and Write Path
 
 ## Current Position
 
-Phase: 2 (EQ Engine and Write Path) — READY TO EXECUTE
-Plan: Not started
+Phase: 02 (EQ Engine and Write Path) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-10-10 — Phase 01 complete, transitioned to Phase 2
+Last activity: 2026-10-10 — Phase 02 execution started
 
 Progress: [███░░░░░░░] 25%
 
@@ -58,6 +58,7 @@ Progress: [███░░░░░░░] 25%
 |------|----------|-------|-------|
 | Phase 01 P01 | 14 min | 2 tasks | 9 files |
 | Phase 01 P02 | 6 min | 3 tasks | 4 files |
+| Phase 02 P01 | 9 min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,11 @@ Recent decisions affecting current work:
 - [Phase 01]: readState ends with disconnected when the dongle was replugged during the read, so one state never combines values from two connections
 - [Phase 01]: JA11Device.watch() supports one watcher and runs a fresh read on every connect; ja11-probe exit statuses are 0 state printed, 1 no JA11, 2 usage error, 3 access refused, 4 read failed
 - [Phase 01]: On the real JA11, Input Monitoring status was unknown while open and reads succeeded: no grant was needed for the probe as launched from Claude Code. A refusal was never seen; unplug/replug, buttons and the permission check await human verification
+- [Phase 02]: The transport send gate is FiioFrame.isPermittedFrame: GET shapes as before plus 20-byte SET frames for the five write commands with values inside device limits; a save is accepted for slot 3 only
+- [Phase 02]: D-01 filter payload is 8 data bytes followed by the 00 EE terminator; the PROJECT.md reference frame is pinned byte for byte
+- [Phase 02]: Clamping replaces NaN (gain and pre-gain 0.0, Q 0.1, frequency 20 Hz), clamps, then rounds to the wire step with ties away from zero
+- [Phase 02]: Read-back comparison rounds to wire units without clamping, so a device value outside the limits is always a difference
+- [Phase 02]: Biquad magnitude is evaluated through sin^2(w/2) to avoid cancellation at low frequencies; response math runs at a nominal 96 kHz
 
 ### Pending Todos
 
@@ -104,6 +110,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-10T13:30:12.428Z
-Stopped at: Phase 01 complete, ready to plan Phase 2
+Last session: 2026-10-10T15:38:09.240Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None

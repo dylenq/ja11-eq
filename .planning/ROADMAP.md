@@ -52,11 +52,11 @@ Plans:
   4. The active preset can be switched between Vocal, Classic, Bass, USER1 and Off, each confirmed by read-back; a save to any slot other than 3 is refused, and Vocal, Classic and Bass read back the same before and after a write and a restore.
   5. Without the device attached, `swift test` shows that out-of-range values (band count, gain, Q, pre-gain, frequency) are clamped to device limits before encoding, that the reference filter frame in PROJECT.md encodes byte-for-byte, that the combined response of peak, low-shelf and high-shelf bands matches known values, and that auto pre-gain offsets the curve's largest boost within −12…0 dB.
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 02-01-PLAN.md — Curve model with clamping, SET-frame codec, the replaced send gate, apply with read-back on an in-memory dongle, response math and auto pre-gain (no device contact)
+- [x] 02-01-PLAN.md — Curve model with clamping, SET-frame codec, the replaced send gate, apply with read-back on an in-memory dongle, response math and auto pre-gain (no device contact)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 02-02-PLAN.md — Apply failure handling and recovery after a drop off USB, preset switching, backup and restore, the `JA11Writer` door (no device contact)
@@ -102,6 +102,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Device Link | 2/2 | Complete    | 2026-10-10 |
-| 2. EQ Engine and Write Path | 0/TBD | Not started | - |
+| 2. EQ Engine and Write Path | 1/4 | In Progress | - |
 | 3. App UI | 0/TBD | Not started | - |
 | 4. Packaging | 0/TBD | Not started | - |
