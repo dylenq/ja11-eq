@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: EQ Engine and Write Path
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-10-10T15:38:09.256Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-10-10T15:50:22.137Z"
 last_activity: 2026-10-10
 last_activity_desc: Phase 02 execution started
-state_head: f927ef926844dab17468086c32cdbd88cfbce7b6
+state_head: 33fd770089b2acade90a534c59a0807a9e5e26ad
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 ## Current Position
 
 Phase: 02 (EQ Engine and Write Path) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-10-10 — Phase 02 execution started
 
@@ -59,6 +59,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 01 P01 | 14 min | 2 tasks | 9 files |
 | Phase 01 P02 | 6 min | 3 tasks | 4 files |
 | Phase 02 P01 | 9 min | 3 tasks | 11 files |
+| Phase 02 P02 | 9 min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,11 @@ Recent decisions affecting current work:
 - [Phase 02]: Clamping replaces NaN (gain and pre-gain 0.0, Q 0.1, frequency 20 Hz), clamps, then rounds to the wire step with ties away from zero
 - [Phase 02]: Read-back comparison rounds to wire units without clamping, so a device value outside the limits is always a difference
 - [Phase 02]: Biquad magnitude is evaluated through sin^2(w/2) to avoid cancellation at low frequencies; response math runs at a nominal 96 kHz
+- [Phase 02]: Write pauses and timeouts: framePause 100 ms, saveSettle 1500 ms, reconnectTimeout 10 s, read-back retry wait 200 ms; before the save any failure ends the apply with writeInterrupted and no save, after it only the select frame may repeat
+- [Phase 02]: After a save, disconnected, notConnected, noReply, busy, transport(notConnected) and transport(sendFailed) mean not usable yet and lead to another read-back round; any other error ends the apply
+- [Phase 02]: captureUser1 re-selects the slot that was active and requires the read-back to match, beyond the letter of D-13; a backup from USER1 sends no write frame
+- [Phase 02]: The backup file is written once through a temporary file and link(2); nothing in BackupStore replaces, changes or deletes an existing file, and an unreadable file stops every write
+- [Phase 02]: JA11Writer is the only public way to write; apply, applyTestCurve and selectSlot take the backup first, and an unconfirmed restore sends nothing further
 
 ### Pending Todos
 
@@ -110,6 +116,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-10T15:38:09.240Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-10-10T15:50:22.121Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
