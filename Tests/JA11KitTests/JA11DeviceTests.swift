@@ -204,6 +204,32 @@ final class Recorder<Value: Sendable>: @unchecked Sendable {
         #expect(try await device.readState() == Self.stateA)
     }
 
+    // MARK: - Trace (D-15)
+
+    @Test func theTraceHoldsEveryFrameSentAndEveryReportReceived() async throws {
+        let log = Recorder<(direction: FrameDirection, bytes: [UInt8])>()
+        let (device, fake) = try await Self.makeDevice(trace: { log.append(($0, $1)) })
+        let delivered = Recorder<[UInt8]>()
+        let normal = Self.replies()
+        fake.responder = { payload in
+            let reports = normal(payload)
+            reports.forEach(delivered.append)
+            return reports
+        }
+
+        _ = try await device.readState()
+
+        let entries = log.values
+        let sent = entries.filter { $0.direction == .sent }.map(\.bytes)
+        let received = entries.filter { $0.direction == .received }.map(\.bytes)
+        #expect(sent.count == 5)
+        #expect(sent == fake.sent)
+        #expect(received.count == 5)
+        #expect(received == delivered.values)
+        #expect(entries.first?.direction == .sent)
+        #expect(entries.first?.bytes == FiioFrame.getRequest(.presetSlot))
+    }
+
     // MARK: - Frame form (D-03)
 
     @Test func fallsBackToTheUnpaddedFormOnceAndKeepsIt() async throws {

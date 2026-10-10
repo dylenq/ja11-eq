@@ -1,4 +1,5 @@
 import Foundation
+import IOKit.hid
 import JA11Kit
 
 // Lines appear as they are printed, also when stdout is a pipe or a file.
@@ -49,11 +50,44 @@ func exitCleanlyOnStopSignals() -> [any DispatchSourceSignal] {
     }
 }
 
-/// One `tx:` line per frame handed to the transport, one `rx:` line per input report as delivered.
-@Sendable func printFrame(_ direction: FrameDirection, _ bytes: [UInt8]) {
-    switch direction {
-    case .sent: print("tx: " + FiioFrame.hex(bytes))
-    case .received: print("rx: " + FiioFrame.hex(bytes))
+/// True the first time it is asked and false ever after, from whichever thread.
+final class Once: @unchecked Sendable {
+    private let lock = NSLock()
+    private var used = false
+
+    func first() -> Bool {
+        lock.withLock {
+            defer { used = true }
+            return !used
+        }
+    }
+}
+
+/// The `--raw` trace: one `tx:` line per frame handed to the transport and one `rx:` line per
+/// input report as delivered. After the first report that holds a reply it says, once, where the
+/// reply header sat: 1 means the report arrived with a leading report-ID byte.
+func makeRawTrace() -> @Sendable (FrameDirection, [UInt8]) -> Void {
+    let offsetLine = Once()
+    return { direction, bytes in
+        switch direction {
+        case .sent:
+            print("tx: " + FiioFrame.hex(bytes))
+        case .received:
+            print("rx: " + FiioFrame.hex(bytes))
+            if let reply = FiioFrame.replyFrame(from: bytes), offsetLine.first() {
+                print("info: reply header offset: \(reply.headerOffset)")
+            }
+        }
+    }
+}
+
+/// What macOS says about Input Monitoring access for this process. A status query only: it never
+/// makes macOS show a permission prompt.
+func inputMonitoringAccess() -> String {
+    switch IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) {
+    case kIOHIDAccessTypeGranted: "granted"
+    case kIOHIDAccessTypeDenied: "denied"
+    default: "unknown"
     }
 }
 
@@ -81,7 +115,11 @@ if help {
     exit(ExitStatus.statePrinted)
 }
 
-let device = JA11Device(transport: HIDTransport(), trace: raw ? printFrame : nil)
+// `--raw` changes what is printed, never what is sent.
+if raw {
+    print("info: input-monitoring access: \(inputMonitoringAccess())")
+}
+let device = JA11Device(transport: HIDTransport(), trace: raw ? makeRawTrace() : nil)
 
 if watching {
     printError("watching for the JA11 (Ctrl-C to stop)")
