@@ -21,6 +21,21 @@ public struct FiioReplyFrame: Sendable, Equatable {
         return byte(at: 6)
     }
 
+    /// The number of filters in use, when this is a reply to the filter-count request.
+    public func filterCount() -> Int? {
+        nil  // RED stub: replaced in the implementation commit
+    }
+
+    /// The pre-gain in dB, when this is a reply to the pre-gain request.
+    public func preGain() -> Double? {
+        nil  // RED stub: replaced in the implementation commit
+    }
+
+    /// The filter this reply describes, when this is a reply to a filter request.
+    public func band() -> Band? {
+        nil  // RED stub: replaced in the implementation commit
+    }
+
     /// One frame byte, or nil when the frame is too short to hold it.
     private func byte(at index: Int) -> UInt8? {
         bytes.indices.contains(index) ? bytes[index] : nil
@@ -87,6 +102,16 @@ public enum FiioFrame {
             return FiioReplyFrame(headerOffset: offset, command: bytes[4], bytes: bytes)
         }
         return nil
+    }
+
+    /// Two bytes, high byte first, as a signed 16-bit number (two's complement).
+    public static func int16BE(_ high: UInt8, _ low: UInt8) -> Int {
+        0  // RED stub: replaced in the implementation commit
+    }
+
+    /// Two bytes, high byte first, as an unsigned 16-bit number.
+    public static func uint16BE(_ high: UInt8, _ low: UInt8) -> Int {
+        0  // RED stub: replaced in the implementation commit
     }
 
     /// Bytes as two-digit lowercase hex separated by single spaces, e.g. `bb 0b 00`.

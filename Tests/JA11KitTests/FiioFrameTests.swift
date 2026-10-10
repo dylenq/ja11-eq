@@ -11,6 +11,38 @@ import Testing
     /// A reply saying the active slot is 3 (USER1).
     static let slotReply: [UInt8] = [0xBB, 0x0B, 0x00, 0x00, 0x16, 0x01, 0x03, 0x00, 0xEE]
 
+    /// The filter-count, pre-gain and filter-3 read requests before padding.
+    static let countRequest: [UInt8] = [0xBB, 0x0B, 0x00, 0x00, 0x18, 0x00, 0x00, 0xEE]
+    static let preGainRequest: [UInt8] = [0xBB, 0x0B, 0x00, 0x00, 0x17, 0x00, 0x00, 0xEE]
+    static let filter3Request: [UInt8] = [0xBB, 0x0B, 0x00, 0x00, 0x15, 0x01, 0x03, 0x00, 0xEE]
+
+    /// A reply saying five filters are in use.
+    static let countReply: [UInt8] = [0xBB, 0x0B, 0x00, 0x00, 0x18, 0x01, 0x05, 0x00, 0xEE]
+    /// Pre-gain replies for -6.0 dB, +3.0 dB and 0.0 dB.
+    static let preGainMinus6Reply: [UInt8] = [0xBB, 0x0B, 0x00, 0x00, 0x17, 0x02, 0xFF, 0xC4, 0x00, 0xEE]
+    static let preGainPlus3Reply: [UInt8] = [0xBB, 0x0B, 0x00, 0x00, 0x17, 0x02, 0x00, 0x1E, 0x00, 0xEE]
+    static let preGainZeroReply: [UInt8] = [0xBB, 0x0B, 0x00, 0x00, 0x17, 0x02, 0x00, 0x00, 0x00, 0xEE]
+    /// Filter 0: low shelf, 100 Hz, +6.0 dB, Q 0.70.
+    static let lowShelfReply: [UInt8] = [
+        0xBB, 0x0B, 0x00, 0x00, 0x15, 0x08, 0x00, 0x00, 0x3C, 0x00, 0x64, 0x00, 0x46, 0x01, 0x00, 0xEE,
+    ]
+    /// Filter 2: peak, 1000 Hz, -6.0 dB, Q 1.41.
+    static let negativePeakReply: [UInt8] = [
+        0xBB, 0x0B, 0x00, 0x00, 0x15, 0x08, 0x02, 0xFF, 0xC4, 0x03, 0xE8, 0x00, 0x8D, 0x00, 0x00, 0xEE,
+    ]
+
+    /// The low-shelf filter reply with another number in its type byte.
+    static func filterReply(type: UInt8) -> [UInt8] {
+        var reply = lowShelfReply
+        reply[13] = type
+        return reply
+    }
+
+    /// The reply located in a report that holds `frame` zero-padded to 20 bytes.
+    static func parsed(_ frame: [UInt8]) throws -> FiioReplyFrame {
+        try #require(FiioFrame.replyFrame(from: padded(frame)))
+    }
+
     /// A frame zero-padded to one full report.
     static func padded(_ frame: [UInt8]) -> [UInt8] {
         frame + [UInt8](repeating: 0x00, count: max(0, JA11.payloadLength - frame.count))
@@ -166,9 +198,205 @@ import Testing
     }
 
     @Test func slotIDIsNilForAReplyToAnotherCommand() throws {
-        let countReply: [UInt8] = [0xBB, 0x0B, 0x00, 0x00, 0x18, 0x01, 0x05, 0x00, 0xEE]
-        let reply = try #require(FiioFrame.replyFrame(from: Self.padded(countReply)))
-        #expect(reply.slotID() == nil)
+        #expect(try Self.parsed(Self.countReply).slotID() == nil)
+    }
+
+    // MARK: - Every read request (D-03)
+
+    /// Command, request data and the reference frame before padding.
+    static let referenceRequests: [(command: JA11Command, data: [UInt8], frame: [UInt8])] = [
+        (.presetSlot, [], slotRequest),
+        (.filterCount, [], countRequest),
+        (.preGain, [], preGainRequest),
+        (.filter, [3], filter3Request),
+    ]
+
+    @Test func everyUnpaddedRequestIsExactlyItsReferenceFrame() {
+        for request in Self.referenceRequests {
+            #expect(FiioFrame.getRequest(request.command, data: request.data, form: .unpadded) == request.frame)
+        }
+    }
+
+    @Test func everyPaddedRequestIsItsReferenceFrameFollowedByZeroBytesToTwenty() {
+        for request in Self.referenceRequests {
+            let frame = FiioFrame.getRequest(request.command, data: request.data, form: .padded)
+            #expect(frame == Self.padded(request.frame))
+            #expect(frame.count == 20)
+        }
+    }
+
+    @Test func gateAcceptsAllEightReferenceRequests() {
+        for request in Self.referenceRequests {
+            #expect(FiioFrame.isGetRequest(request.frame))
+            #expect(FiioFrame.isGetRequest(Self.padded(request.frame)))
+        }
+    }
+
+    @Test func theOnlyCommandsAreTheFourReadCommands() {
+        #expect(JA11Command.allCases.map(\.rawValue).sorted() == [0x15, 0x16, 0x17, 0x18])
+    }
+
+    // MARK: - Reply decoding (D-05)
+
+    @Test func countReplyDecodesTheFilterCount() throws {
+        #expect(try Self.parsed(Self.countReply).filterCount() == 5)
+    }
+
+    @Test func preGainReplyDecodesNegativeGain() throws {
+        #expect(try Self.parsed(Self.preGainMinus6Reply).preGain() == -6.0)
+    }
+
+    @Test func preGainReplyDecodesPositiveGain() throws {
+        #expect(try Self.parsed(Self.preGainPlus3Reply).preGain() == 3.0)
+    }
+
+    @Test func preGainReplyDecodesZero() throws {
+        #expect(try Self.parsed(Self.preGainZeroReply).preGain() == 0.0)
+    }
+
+    @Test func filterReplyDecodesTheReferenceLowShelf() throws {
+        let band = try #require(try Self.parsed(Self.lowShelfReply).band())
+        #expect(band == Band(index: 0, typeID: 1, frequency: 100, gain: 6.0, q: 0.70))
+        #expect(band.type == .lowShelf)
+    }
+
+    @Test func filterReplyDecodesNegativeGain() throws {
+        let band = try #require(try Self.parsed(Self.negativePeakReply).band())
+        #expect(band == Band(index: 2, typeID: 0, frequency: 1000, gain: -6.0, q: 1.41))
+        #expect(band.type == .peak)
+    }
+
+    @Test func filterTypeByte2IsHighShelf() throws {
+        let band = try #require(try Self.parsed(Self.filterReply(type: 2)).band())
+        #expect(band.typeID == 2)
+        #expect(band.type == .highShelf)
+    }
+
+    @Test func unknownFilterTypeByteStaysVisibleAsItsNumber() throws {
+        let band = try #require(try Self.parsed(Self.filterReply(type: 7)).band())
+        #expect(band.typeID == 7)
+        #expect(band.type == nil)
+    }
+
+    @Test func aQOfZeroIsNotReplacedByADefault() throws {
+        var reply = Self.lowShelfReply
+        reply[11] = 0x00
+        reply[12] = 0x00
+        #expect(try Self.parsed(reply).band()?.q == 0.0)
+    }
+
+    // MARK: - Leading report-ID byte (D-06)
+
+    @Test func everyReplyDecodesTheSameBehindALeadingReportIDByte() throws {
+        func prefixed(_ frame: [UInt8]) throws -> FiioReplyFrame {
+            let reply = try #require(FiioFrame.replyFrame(from: Self.withReportID(Self.padded(frame))))
+            #expect(reply.headerOffset == 1)
+            return reply
+        }
+        #expect(try prefixed(Self.slotReply).slotID() == 3)
+        #expect(try prefixed(Self.countReply).filterCount() == 5)
+        #expect(try prefixed(Self.preGainMinus6Reply).preGain() == -6.0)
+        #expect(try prefixed(Self.preGainPlus3Reply).preGain() == 3.0)
+        #expect(try prefixed(Self.preGainZeroReply).preGain() == 0.0)
+        #expect(try prefixed(Self.lowShelfReply).band() == Band(index: 0, typeID: 1, frequency: 100, gain: 6.0, q: 0.70))
+        #expect(try prefixed(Self.negativePeakReply).band() == Band(index: 2, typeID: 0, frequency: 1000, gain: -6.0, q: 1.41))
+        #expect(try prefixed(Self.filterReply(type: 2)).band()?.type == .highShelf)
+        #expect(try prefixed(Self.filterReply(type: 7)).band()?.typeID == 7)
+    }
+
+    // MARK: - Short and mismatched replies
+
+    @Test func preGainIsNilWhenTheReplyIsCutToSevenBytes() throws {
+        let reply = try #require(FiioFrame.replyFrame(from: Array(Self.preGainMinus6Reply.prefix(7))))
+        #expect(reply.preGain() == nil)
+    }
+
+    @Test func preGainDecodesFromExactlyEightBytes() throws {
+        let reply = try #require(FiioFrame.replyFrame(from: Array(Self.preGainMinus6Reply.prefix(8))))
+        #expect(reply.preGain() == -6.0)
+    }
+
+    @Test func bandIsNilWhenTheReplyIsCutToThirteenBytes() throws {
+        let reply = try #require(FiioFrame.replyFrame(from: Array(Self.lowShelfReply.prefix(13))))
+        #expect(reply.band() == nil)
+    }
+
+    @Test func bandDecodesFromExactlyFourteenBytes() throws {
+        let reply = try #require(FiioFrame.replyFrame(from: Array(Self.lowShelfReply.prefix(14))))
+        #expect(reply.band() == Band(index: 0, typeID: 1, frequency: 100, gain: 6.0, q: 0.70))
+    }
+
+    @Test func filterCountIsNilForASlotReply() throws {
+        #expect(try Self.parsed(Self.slotReply).filterCount() == nil)
+    }
+
+    @Test func decodersAreNilForAReplyToAnotherCommand() throws {
+        #expect(try Self.parsed(Self.countReply).preGain() == nil)
+        #expect(try Self.parsed(Self.countReply).band() == nil)
+        #expect(try Self.parsed(Self.lowShelfReply).preGain() == nil)
+        #expect(try Self.parsed(Self.preGainMinus6Reply).filterCount() == nil)
+    }
+
+    // MARK: - Big-endian numbers (D-05)
+
+    @Test func int16BEIsTwosComplement() {
+        #expect(FiioFrame.int16BE(0xFF, 0xC4) == -60)
+        #expect(FiioFrame.int16BE(0x00, 0x3C) == 60)
+    }
+
+    @Test func uint16BEIsUnsigned() {
+        #expect(FiioFrame.uint16BE(0x03, 0xE8) == 1000)
+        #expect(FiioFrame.uint16BE(0xFF, 0xC4) == 65476)
+    }
+
+    // MARK: - Model (D-02, D-13)
+
+    @Test func presetSlotRawValuesMatchTheSlotIDs() {
+        #expect(PresetSlot.vocal.rawValue == JA11SlotID.vocal)
+        #expect(PresetSlot.classic.rawValue == JA11SlotID.classic)
+        #expect(PresetSlot.bass.rawValue == JA11SlotID.bass)
+        #expect(PresetSlot.user1.rawValue == JA11SlotID.user1)
+        #expect(PresetSlot.off.rawValue == JA11SlotID.off)
+        #expect(PresetSlot.allCases.count == 5)
+    }
+
+    @Test func presetSlotsAndFilterTypesHaveTheirDisplayNames() {
+        #expect(PresetSlot.allCases.map(\.displayName) == ["Vocal", "Classic", "Bass", "USER1", "Off"])
+        #expect(FilterType.allCases.map(\.displayName) == ["peak", "low-shelf", "high-shelf"])
+    }
+
+    @Test func slotAndTypeLookUpTheirTables() {
+        #expect(EQState(slotID: 3, preGain: 0.0, bands: []).slot == .user1)
+        #expect(EQState(slotID: 9, preGain: 0.0, bands: []).slot == nil)
+        #expect(Band(index: 0, typeID: 2, frequency: 100, gain: 0.0, q: 1.0).type == .highShelf)
+        #expect(Band(index: 0, typeID: 7, frequency: 100, gain: 0.0, q: 1.0).type == nil)
+    }
+
+    @Test func reportLinesMatchTheProbeOutputContract() {
+        let state = EQState(slotID: 3, preGain: -6.0, bands: [
+            Band(index: 0, typeID: 1, frequency: 100, gain: 6.0, q: 0.70),
+            Band(index: 1, typeID: 0, frequency: 1000, gain: -3.5, q: 1.41),
+        ])
+        #expect(state.reportLines() == [
+            "slot: 3 (USER1)",
+            "pre-gain: -6.0 dB",
+            "filters: 2",
+            "filter 0: low-shelf 100 Hz +6.0 dB Q 0.70",
+            "filter 1: peak 1000 Hz -3.5 dB Q 1.41",
+        ])
+    }
+
+    @Test func reportLinesKeepAnUnknownSlotVisibleAndShowNoFilters() {
+        #expect(EQState(slotID: 9, preGain: 0.0, bands: []).reportLines() == [
+            "slot: 9 (unknown)",
+            "pre-gain: +0.0 dB",
+            "filters: 0",
+        ])
+    }
+
+    @Test func reportLinesRenderAnUnknownFilterTypeAsItsNumber() {
+        let state = EQState(slotID: 3, preGain: 0.0, bands: [Band(index: 0, typeID: 7, frequency: 100, gain: 0.0, q: 1.0)])
+        #expect(state.reportLines().last == "filter 0: type-7 100 Hz +0.0 dB Q 1.00")
     }
 
     // MARK: - Hex
