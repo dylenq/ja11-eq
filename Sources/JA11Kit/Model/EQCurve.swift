@@ -23,6 +23,22 @@ public struct EQBand: Sendable, Equatable, Codable {
         self.enabled = enabled
     }
 
+    /// Reads a band from a curve file. `enabled` may be left out and then counts as true; every
+    /// other key is required. Nothing is clamped here: a file may hold any numbers, and
+    /// `EQCurve.clamped()` is what the write path applies before encoding.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(FilterType.self, forKey: .type)
+        frequency = try container.decode(Double.self, forKey: .frequency)
+        gain = try container.decode(Double.self, forKey: .gain)
+        q = try container.decode(Double.self, forKey: .q)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type, frequency, gain, q, enabled
+    }
+
     /// The band that fills an unused position: peak, 1000 Hz, 0.0 dB, Q 1.0, disabled.
     public static let neutral = EQBand(type: .peak, frequency: 1000, gain: 0.0, q: 1.0, enabled: false)
 
