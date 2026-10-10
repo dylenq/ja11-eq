@@ -1,7 +1,7 @@
 ---
 phase: 03-app-ui
 verified: 2026-10-11T00:00:00Z
-status: human_needed
+status: passed
 score: 5/5 roadmap truths wired and test-backed; all five still need on-screen/real-device confirmation
 covered_files: [Sources/JA11EQ/ContentView.swift, Sources/JA11EQCore/AppModel.swift, Sources/JA11EQCore/CurveEditor.swift, Sources/JA11EQCore/GraphGeometry.swift]
 covered_digest: "v2:sha256:0463dd375e1049271301d82e92313c2cb55251a15f439a99201e08d58e97a279"
@@ -82,3 +82,7 @@ No code gaps. Completion depends on the human UAT script.
 
 _Verified: 2026-10-11_
 _Verifier: Claude (gsd-verifier)_
+
+## Human Verification Results (2026-10-11)
+
+The user ran the app on the real JA11 with the 11-step script from `03-03-SUMMARY.md` available and reported in the main session: "everything works". No individual step results were reported, and no defects or layout complaints were raised. Status changed from `human_needed` to `passed` on this basis.
