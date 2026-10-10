@@ -103,10 +103,10 @@ Plans:
   2. Double-clicking `JA11 EQ.app` in Finder opens the app, which connects to the JA11 and can read and apply a curve just as the development build does.
   3. The README explains how to build, run, grant permission if macOS asks for it, and restore the original USER1 curve — and following its restore steps does put the original USER1 back.
 
-**Plans**: 1 plan
+**Plans**: 1/1 plans executed
 
 Plans:
-- [ ] 04-01-PLAN.md — make-app.sh builds and ad-hoc signs JA11 EQ.app; README with build, permission and restore steps
+- [x] 04-01-PLAN.md — make-app.sh builds and ad-hoc signs JA11 EQ.app; README with build, permission and restore steps
 
 ## Progress
 
@@ -118,4 +118,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Device Link | 2/2 | Complete    | 2026-10-10 |
 | 2. EQ Engine and Write Path | 4/4 | In Progress | - |
 | 3. App UI | 3/3 | In Progress | - |
-| 4. Packaging | 0/TBD | Not started | - |
+| 4. Packaging | 1/1 | In Progress | - |

@@ -44,8 +44,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Packaging
 
-- [ ] **PKG-01**: One script builds a double-clickable `JA11 EQ.app`
-- [ ] **PKG-02**: A README explains how to build, run, grant permission if needed, and restore the original USER1 curve
+- [x] **PKG-01**: One script builds a double-clickable `JA11 EQ.app`
+- [x] **PKG-02**: A README explains how to build, run, grant permission if needed, and restore the original USER1 curve
 
 ## v2 Requirements
 
@@ -114,8 +114,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | APP-08 | Phase 3 | Complete |
 | APP-09 | Phase 3 | Complete |
 | APP-10 | Phase 3 | Complete |
-| PKG-01 | Phase 4 | Pending |
-| PKG-02 | Phase 4 | Pending |
+| PKG-01 | Phase 4 | Complete |
+| PKG-02 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 28 total
