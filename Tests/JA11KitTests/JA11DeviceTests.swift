@@ -374,6 +374,141 @@ final class Recorder<Value: Sendable>: @unchecked Sendable {
         #expect(fake.sent.isEmpty)
     }
 
+    @Test func aReplugInTheMiddleOfAReadEndsThatRead() async throws {
+        let (device, fake) = try await Self.makeDevice()
+        let normal = Self.replies()
+        // The dongle goes away and comes back between the slot reply and the count reply.
+        fake.responder = { payload in
+            if payload[4] == 0x18 {
+                fake.emit(.disconnected)
+                fake.emit(.connected)
+            }
+            return normal(payload)
+        }
+
+        #expect(await Self.failure { try await device.readState() } == .disconnected)
+    }
+
+    // MARK: - Watching the link (D-09, D-14)
+
+    /// Starts watching and collects every update.
+    static func collect(_ device: JA11Device) -> Recorder<LinkUpdate> {
+        let log = Recorder<LinkUpdate>()
+        let updates = device.watch()
+        Task {
+            for await update in updates {
+                log.append(update)
+            }
+        }
+        return log
+    }
+
+    static var stateB: EQState {
+        var state = stateA
+        state.preGain = 3.0
+        return state
+    }
+
+    @Test func watchReadsOnConnectAndReadsAgainAfterAReplug() async throws {
+        let (device, fake) = try await Self.makeDevice(connected: false)
+        fake.responder = Self.replies()
+        let log = Self.collect(device)
+
+        fake.emit(.connected)
+        #expect(await Self.waitUntil { log.values.count == 2 })
+        #expect(log.values == [.connected, .state(Self.stateA)])
+
+        fake.emit(.disconnected)
+        #expect(await Self.waitUntil { log.values.count == 3 })
+        #expect(log.values.last == .disconnected)
+
+        fake.responder = Self.replies(preGain: Self.preGainPlus3)
+        fake.emit(.connected)
+        #expect(await Self.waitUntil { log.values.count == 5 })
+        #expect(log.values == [
+            .connected, .state(Self.stateA), .disconnected, .connected, .state(Self.stateB),
+        ])
+    }
+
+    @Test func watchFollowsThreeConnectAndDisconnectCyclesInOrder() async throws {
+        let (device, fake) = try await Self.makeDevice(connected: false)
+        fake.responder = Self.replies()
+        let log = Self.collect(device)
+
+        for cycle in 1...3 {
+            fake.emit(.connected)
+            #expect(await Self.waitUntil { log.values.count == cycle * 3 - 1 })
+            fake.emit(.disconnected)
+            #expect(await Self.waitUntil { log.values.count == cycle * 3 })
+        }
+
+        let cycleUpdates: [LinkUpdate] = [.connected, .state(Self.stateA), .disconnected]
+        #expect(log.values == cycleUpdates + cycleUpdates + cycleUpdates)
+    }
+
+    @Test func watchReportsAFailedReadAndStillFollowsTheNextConnect() async throws {
+        let (device, fake) = try await Self.makeDevice(connected: false)
+        let log = Self.collect(device)
+
+        fake.emit(.connected)
+        #expect(await Self.waitUntil { log.values.count == 2 })
+        #expect(log.values == [.connected, .readFailed(.noReply(.presetSlot))])
+
+        fake.emit(.disconnected)
+        #expect(await Self.waitUntil { log.values.count == 3 })
+        fake.responder = Self.replies()
+        fake.emit(.connected)
+        #expect(await Self.waitUntil { log.values.count == 5 })
+        #expect(Array(log.values.dropFirst(2)) == [.disconnected, .connected, .state(Self.stateA)])
+    }
+
+    @Test func watchPassesOnAFailedOpen() async throws {
+        let (device, fake) = try await Self.makeDevice(connected: false)
+        let refusal = HIDTransportError.accessDenied(code: Int32(bitPattern: 0xE00002E2))
+        let log = Self.collect(device)
+
+        fake.emit(.openFailed(refusal))
+
+        #expect(await Self.waitUntil { log.values.count == 1 })
+        #expect(log.values == [.openFailed(refusal)])
+    }
+
+    @Test func watchStartsWithAReadWhenTheDeviceIsAlreadyConnected() async throws {
+        let (device, fake) = try await Self.makeDevice()
+        fake.responder = Self.replies()
+
+        let log = Self.collect(device)
+
+        #expect(await Self.waitUntil { log.values.count == 2 })
+        #expect(log.values == [.connected, .state(Self.stateA)])
+    }
+
+    @Test func watchStartsTheTransportItself() async throws {
+        let fake = FakeTransport()
+        fake.responder = Self.replies()
+        let device = JA11Device(transport: fake, replyTimeout: .milliseconds(100))
+        let log = Self.collect(device)
+
+        fake.emit(.connected)
+
+        #expect(await Self.waitUntil { log.values.count == 2 })
+        #expect(log.values == [.connected, .state(Self.stateA)])
+    }
+
+    @Test func anUnplugDuringTheWatchersReadShowsAsDisconnectedOnly() async throws {
+        let (device, fake) = try await Self.makeDevice(connected: false, replyTimeout: .seconds(5))
+        let log = Self.collect(device)
+
+        fake.emit(.connected)
+        #expect(await Self.waitUntil { fake.sent.count == 1 })
+        let unplugged = ContinuousClock.now
+        fake.emit(.disconnected)
+
+        #expect(await Self.waitUntil { log.values.count == 2 })
+        #expect(ContinuousClock.now - unplugged < .seconds(1))
+        #expect(log.values == [.connected, .disconnected])
+    }
+
     // MARK: - Discovery (D-10, D-13)
 
     @Test func noDongleWithinTheDiscoveryTimeoutIsNotFound() async throws {

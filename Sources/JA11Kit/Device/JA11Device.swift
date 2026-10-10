@@ -41,6 +41,20 @@ public enum FrameDirection: Sendable {
     case received
 }
 
+/// One step in the life of the link, as `JA11Device.watch()` reports it.
+public enum LinkUpdate: Sendable, Equatable {
+    /// A JA11 was connected. A read of its state follows.
+    case connected
+    /// The state read after the latest connect.
+    case state(EQState)
+    /// The read after the latest connect failed.
+    case readFailed(JA11Error)
+    /// The JA11 was unplugged.
+    case disconnected
+    /// A JA11 was found but could not be opened.
+    case openFailed(HIDTransportError)
+}
+
 /// Reads the JA11's EQ state over a `ReportTransport`.
 ///
 /// The actor offers read operations only: every frame it builds is a read request, and nothing
@@ -186,6 +200,13 @@ public actor JA11Device {
             bands.append(try await readFilter(index: index))
         }
         return EQState(slotID: slotID, preGain: preGain, bands: bands)
+    }
+
+    // MARK: - Watching
+
+    /// Follows the link: every connect, the state read after it, every disconnect.
+    public nonisolated func watch() -> AsyncStream<LinkUpdate> {
+        AsyncStream { $0.finish() }
     }
 
     // MARK: - Requests
