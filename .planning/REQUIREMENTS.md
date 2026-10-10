@@ -10,11 +10,11 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Device Link
 
 - [x] **LINK-01**: The JA11 (VID `0x2972`, PID `0x0102`) is found automatically when it is connected, with no manual selection
-- [ ] **LINK-02**: Connection status follows the dongle being unplugged and plugged back in, without restarting
+- [x] **LINK-02**: Connection status follows the dongle being unplugged and plugged back in, without restarting
 - [x] **LINK-03**: The DAC's active preset slot, pre-gain and all filter settings can be read from the device
 - [x] **LINK-04**: A `ja11-probe` command prints the DAC's current slot, pre-gain and filters without changing anything on the device
-- [ ] **LINK-05**: The dongle's volume and play/pause buttons keep working while the device is open
-- [ ] **LINK-06**: If macOS refuses access to the device, the user is told which permission to grant and where
+- [x] **LINK-05**: The dongle's volume and play/pause buttons keep working while the device is open
+- [x] **LINK-06**: If macOS refuses access to the device, the user is told which permission to grant and where
 
 ### EQ Engine and Write Path
 
@@ -89,11 +89,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | LINK-01 | Phase 1 | Complete |
-| LINK-02 | Phase 1 | Pending |
+| LINK-02 | Phase 1 | Complete |
 | LINK-03 | Phase 1 | Complete |
 | LINK-04 | Phase 1 | Complete |
-| LINK-05 | Phase 1 | Pending |
-| LINK-06 | Phase 1 | Pending |
+| LINK-05 | Phase 1 | Complete |
+| LINK-06 | Phase 1 | Complete |
 | WRITE-01 | Phase 2 | Pending |
 | WRITE-02 | Phase 2 | Pending |
 | WRITE-03 | Phase 2 | Pending |

@@ -1,8 +1,8 @@
 ---
 phase: 01-device-link
 verified: 2026-10-10T13:32:47Z
-status: human_needed
-score: 12/16 must-haves verified
+status: passed
+score: 16/16 must-haves verified
 covered_files:
   - .gitignore
   - .planning/phases/01-device-link/01-01-PLAN.md
@@ -206,3 +206,17 @@ No gaps. The read path is real and works on the hardware: the probe finds the JA
 
 _Verified: 2026-10-10T13:32:47Z_
 _Verifier: Claude (gsd-verifier)_
+
+## Human Verification Results (2026-10-10)
+
+Performed by the user from Terminal.app on the real JA11; results reported in the main session.
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | Unplug and replug with `--watch` (LINK-02) | Passed — `disconnected`, then `connected` with a fresh state read, no restart. One cycle performed rather than two. |
+| 2 | No dongle (D-13) | Passed — printed `No JA11 found (looked for USB VID 0x2972, PID 0x0102). Plug the dongle in and run again.` |
+| 3 | Buttons while the device is open (LINK-05) | Passed — user confirmed the buttons work. |
+| 4 | Permission (LINK-06) | No refusal: the probe opened and read the device from Terminal.app with no Input Monitoring prompt. The refusal message remains proven by unit tests only; a double-clicked app is re-checked in Phase 4. |
+| 5 | Flagged prohibitions (4) | Accepted by the user on the verifier's code reading; no additional test requested. |
+
+Status changed from `human_needed` to `passed` on this basis.

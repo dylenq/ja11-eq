@@ -12,7 +12,7 @@ JA11 EQ goes from an empty repo to a double-clickable Mac app in four steps, eac
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Device Link** - Find the JA11 over USB HID and read its slot, pre-gain and filters with a read-only `ja11-probe` CLI
+- [x] **Phase 1: Device Link** - Find the JA11 over USB HID and read its slot, pre-gain and filters with a read-only `ja11-probe` CLI (completed 2026-10-10)
 - [ ] **Phase 2: EQ Engine and Write Path** - Write a clamped curve to USER1, confirm it by read-back, keep it across a replug, and be able to restore the original
 - [ ] **Phase 3: App UI** - SwiftUI window with device header, 5-band editor, draggable response graph, pre-gain with Auto, and Apply
 - [ ] **Phase 4: Packaging** - One script builds an ad-hoc signed, double-clickable `JA11 EQ.app`, plus a README
@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. While the probe has the device open, the dongle's volume and play/pause buttons still control the Mac.
   5. If macOS refuses access to the device, the probe names the permission to grant and where in System Settings to grant it, instead of a bare error.
 
-**Plans**: 2/2 plans executed
+**Plans**: 2/2 plans complete
 
 Plans:
 **Wave 1**
@@ -88,7 +88,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Device Link | 2/2 | In Progress | - |
+| 1. Device Link | 2/2 | Complete    | 2026-10-10 |
 | 2. EQ Engine and Write Path | 0/TBD | Not started | - |
 | 3. App UI | 0/TBD | Not started | - |
 | 4. Packaging | 0/TBD | Not started | - |
