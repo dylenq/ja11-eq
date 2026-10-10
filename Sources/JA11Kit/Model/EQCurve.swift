@@ -110,6 +110,13 @@ public struct EQCurve: Sendable, Equatable, Codable {
     }
 }
 
+extension EQCurve {
+    /// The built-in test curve.
+    public static func testCurve(basedOn original: EQCurve) -> EQCurve {
+        original
+    }
+}
+
 extension FilterType: Codable {
     /// Name in a curve file.
     var codingName: String {
