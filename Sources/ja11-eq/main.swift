@@ -257,8 +257,171 @@ case .applyFile(let path):
 
 let invocation = Invocation(operation: operation, raw: raw)
 
-// The part that opens the device and runs the operation follows in the next commit of this plan.
-// Until then a valid command ends here, before any transport exists.
-_ = invocation
-printError("ja11-eq: this build checks the command line only; nothing was sent to the JA11.")
-exit(ExitStatus.operationFailed)
+// The backup file is looked at before a transport exists as well. A file that is there but cannot
+// be read stops every command, and a restore needs the file. `backup` with a file already there
+// needs no device at all: it prints the file and ends.
+do {
+    switch invocation.operation {
+    case .backup:
+        if CLI.store.exists {
+            let backup = try CLI.store.load()
+            printBackupLine(saved: false)
+            printBackupDetails(backup)
+            exit(ExitStatus.confirmed)
+        }
+    case .restore:
+        _ = try CLI.store.load()
+        printBackupLine(saved: false)
+    case .apply, .applyTestCurve, .slot:
+        if CLI.store.exists {
+            _ = try CLI.store.load()
+        }
+    }
+} catch {
+    printError(errorText(error))
+    exit(exitStatus(for: error))
+}
+
+// `--raw` changes what is printed, never what is sent. Every write goes through the writer, which
+// sees to the backup first; this file builds no frame and calls no other write function.
+let device = JA11Device(transport: HIDTransport(), trace: invocation.raw ? makeRawTrace() : nil)
+let writer = JA11Writer(device: device, store: CLI.store)
+
+do {
+    await device.start()
+    try await device.waitForConnection()
+
+    switch invocation.operation {
+    case .backup:
+        let outcome = try await writer.backup()
+        printBackupLine(outcome)
+        printBackupDetails(outcome.backup)
+        exit(ExitStatus.confirmed)
+
+    case .apply(let curve):
+        printBackupLine(try await writer.backup())
+        let report = try await writer.apply(curve)
+        printApply(report)
+        exitWithResult(isConfirmed: report.isConfirmed)
+
+    case .applyTestCurve:
+        printBackupLine(try await writer.backup())
+        let report = try await writer.applyTestCurve()
+        printApply(report)
+        exitWithResult(isConfirmed: report.isConfirmed)
+
+    case .restore:
+        let report = try await writer.restore()
+        printApply(report.apply)
+        if report.finalSlotID != report.expectedSlotID {
+            print("diff: final slot: expected \(slotText(report.expectedSlotID)), read \(slotText(report.finalSlotID))")
+        }
+        print("final: slot: \(slotText(report.finalSlotID))")
+        exitWithResult(isConfirmed: report.isConfirmed)
+
+    case .slot(let slot):
+        printBackupLine(try await writer.backup())
+        let report = try await writer.selectSlot(slot)
+        print("sent: slot: \(slotText(report.requested.rawValue))")
+        print("read: slot: \(slotText(report.readSlotID))")
+        // What the device holds in this slot, as far as it lets itself be read. Not being able to
+        // read it is information, not a failure of the switch.
+        do {
+            for line in try await device.readState().reportLines() {
+                print("state: " + line)
+            }
+        } catch {
+            print("info: state not readable in this slot: \(errorText(error))")
+        }
+        exitWithResult(isConfirmed: report.isConfirmed)
+    }
+} catch {
+    printError(errorText(error))
+    exit(exitStatus(for: error))
+}
+
+// MARK: - Output
+
+/// `backup: saved <path>` when this run created the file, `backup: kept <path>` when it was there.
+func printBackupLine(saved: Bool) {
+    print("backup: \(saved ? "saved" : "kept") \(CLI.store.fileURL.path)")
+}
+
+func printBackupLine(_ outcome: BackupOutcome) {
+    switch outcome {
+    case .created: printBackupLine(saved: true)
+    case .kept: printBackupLine(saved: false)
+    }
+}
+
+/// When the backup was taken, and USER1's original contents with the slot that was active then.
+func printBackupDetails(_ backup: DeviceBackup) {
+    print("backup-time: \(ISO8601DateFormatter().string(from: backup.savedAt))")
+    var original = backup.curve.deviceState()
+    original.slotID = backup.activeSlot
+    for line in original.reportLines() {
+        print("original: " + line)
+    }
+}
+
+/// What an apply sent, what the link did after the save, what was read back and how it differs.
+func printApply(_ report: ApplyReport) {
+    for line in report.sent.reportLines() {
+        print("sent: " + line)
+    }
+    for event in report.linkEvents {
+        let kind = switch event.kind {
+        case .disconnected: "disconnected"
+        case .connected: "connected"
+        }
+        print("link: \(kind) \(String(format: "%+.2f", event.secondsAfterSave))s")
+    }
+    for line in report.readBack.reportLines() {
+        print("read: " + line)
+    }
+    for line in report.differences {
+        print("diff: " + line)
+    }
+}
+
+/// The one place a result line is printed. `isConfirmed` comes from a report's own `isConfirmed`,
+/// so nothing is called confirmed that the read-back does not confirm.
+func exitWithResult(isConfirmed: Bool) -> Never {
+    if isConfirmed {
+        print("result: confirmed")
+        exit(ExitStatus.confirmed)
+    }
+    print("result: mismatch")
+    exit(ExitStatus.mismatch)
+}
+
+func slotText(_ id: UInt8) -> String {
+    "\(id) (\(PresetSlot(rawValue: id)?.displayName ?? "unknown"))"
+}
+
+func errorText(_ error: any Error) -> String {
+    if let error = error as? JA11Error { return error.description }
+    if let error = error as? BackupError { return error.description }
+    return String(describing: error)
+}
+
+/// The exit status that tells a script why the operation was not confirmed.
+func exitStatus(for error: any Error) -> Int32 {
+    if error is BackupError { return ExitStatus.backupProblem }
+    switch error as? JA11Error {
+    case .notFound: return ExitStatus.notFound
+    case .transport(.accessDenied): return ExitStatus.accessRefused
+    default: return ExitStatus.operationFailed
+    }
+}
+
+/// The `--raw` trace: one `tx:` line per frame handed to the transport and one `rx:` line per
+/// input report as delivered.
+func makeRawTrace() -> @Sendable (FrameDirection, [UInt8]) -> Void {
+    { direction, bytes in
+        switch direction {
+        case .sent: print("tx: " + FiioFrame.hex(bytes))
+        case .received: print("rx: " + FiioFrame.hex(bytes))
+        }
+    }
+}
