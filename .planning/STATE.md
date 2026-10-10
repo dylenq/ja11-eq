@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 3
+current_phase: 03
 current_phase_name: App UI
 status: executing
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-10-10T18:46:17.259Z"
-last_activity: 2026-10-10
-last_activity_desc: Phase 02 execution started
-state_head: f67ec39ccf700716537e264b22bbe07e1fcbd125
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-10-10T18:48:49.137Z"
+last_activity: 2026-10-11
+last_activity_desc: Phase 03 execution started
+state_head: d0a6e6bcbd40b29872dd93261667552340a4058f
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 25
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-10)
 
 **Core value:** Edit an EQ curve on the Mac, press Apply, and the JA11 plays with that curve — reliably, and without ever damaging the dongle's factory presets.
-**Current focus:** Phase 02 — EQ Engine and Write Path
+**Current focus:** Phase 03 — App UI
 
 ## Current Position
 
-Phase: 3 (App UI) — READY TO EXECUTE
-Plan: 4 of 4
+Phase: 03 (App UI) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-10-10 — Phase 02 execution started
+Last activity: 2026-10-11 — Phase 03 execution started
 
 Progress: [███░░░░░░░] 25%
 
@@ -62,6 +62,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02 P02 | 9 min | 2 tasks | 9 files |
 | Phase 02 P03 | 3 min | 2 tasks | 2 files |
 | Phase 02 P04 | 25min | 3 tasks | 1 files |
+| Phase 03 P01 | 25min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,7 @@ Recent decisions affecting current work:
 - [Phase 02]: ja11-eq exit statuses: 0 confirmed, 1 no JA11, 2 usage error or unreadable curve file, 3 access refused, 4 device operation failed, 5 read-back mismatch, 6 backup problem; backup prints no result line and sent: lines appear only when an operation returned a report
 - [Phase 02]: A curve file is refused when it is not a regular file, exceeds 64 KB, does not decode or holds more than five bands; the device part of ja11-eq was compiled but not run before plan 02-04
 - [Phase 02]: Plan 02-04: first writes on the real JA11 accepted with 00 before EE; dongle drops off USB ~0.9s after each save and ja11-eq recovers; factory slots readable; trailing byte is not a checksum
+- [Phase 03]: AppModel.handle(_:) is the single link-state mutation point; sample rate text uses integer tenths of kHz, locale independent
 
 ### Pending Todos
 
@@ -122,6 +124,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-10T18:24:54.082Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-10-10T18:48:49.112Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None

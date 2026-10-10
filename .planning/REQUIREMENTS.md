@@ -31,7 +31,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### App
 
-- [ ] **APP-01**: User sees whether the DAC is connected and which preset is active
+- [x] **APP-01**: User sees whether the DAC is connected and which preset is active
 - [ ] **APP-02**: User can switch preset from a picker: Vocal / Classic / Bass / Custom / Off
 - [ ] **APP-03**: User can set each band's type (peak, low shelf, high shelf), frequency, gain and Q
 - [ ] **APP-04**: User can turn each band on or off
@@ -40,7 +40,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **APP-07**: User can set pre-gain by hand, or switch on Auto so it follows the curve
 - [ ] **APP-08**: User can press Apply to send the curve to the DAC, and sees whether it was confirmed
 - [ ] **APP-09**: When the DAC connects, the editor loads the curve currently stored on it
-- [ ] **APP-10**: User sees the DAC's current output sample rate
+- [x] **APP-10**: User sees the DAC's current output sample rate
 
 ### Packaging
 
@@ -104,7 +104,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WRITE-08 | Phase 2 | Complete |
 | WRITE-09 | Phase 2 | Complete |
 | WRITE-10 | Phase 2 | Complete |
-| APP-01 | Phase 3 | Pending |
+| APP-01 | Phase 3 | Complete |
 | APP-02 | Phase 3 | Pending |
 | APP-03 | Phase 3 | Pending |
 | APP-04 | Phase 3 | Pending |
@@ -113,7 +113,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | APP-07 | Phase 3 | Pending |
 | APP-08 | Phase 3 | Pending |
 | APP-09 | Phase 3 | Pending |
-| APP-10 | Phase 3 | Pending |
+| APP-10 | Phase 3 | Complete |
 | PKG-01 | Phase 4 | Pending |
 | PKG-02 | Phase 4 | Pending |
 
