@@ -18,14 +18,14 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### EQ Engine and Write Path
 
-- [ ] **WRITE-01**: A 5-band curve plus pre-gain can be written to the DAC's USER1 slot and made the active preset
-- [ ] **WRITE-02**: After a write, the device is read back and any mismatch with what was sent is reported
+- [x] **WRITE-01**: A 5-band curve plus pre-gain can be written to the DAC's USER1 slot and made the active preset
+- [x] **WRITE-02**: After a write, the device is read back and any mismatch with what was sent is reported
 - [ ] **WRITE-03**: A written curve is still on the DAC after it is unplugged and plugged back in
-- [ ] **WRITE-04**: Factory presets (Vocal, Classic, Bass) are never modified — only slot 3 is ever written
+- [x] **WRITE-04**: Factory presets (Vocal, Classic, Bass) are never modified — only slot 3 is ever written
 - [x] **WRITE-05**: Every value is clamped to device limits (5 bands, gain ±12 dB, Q 0.1–10, pre-gain ±12 dB, 20 Hz–20 kHz) before it is sent
-- [ ] **WRITE-06**: The DAC's original USER1 contents are saved to a file before the first write, and can be restored from it
-- [ ] **WRITE-07**: If the dongle drops off USB after a save, the link recovers on its own and state is re-read
-- [ ] **WRITE-08**: The active preset can be switched between Vocal, Classic, Bass, USER1 and Off
+- [x] **WRITE-06**: The DAC's original USER1 contents are saved to a file before the first write, and can be restored from it
+- [x] **WRITE-07**: If the dongle drops off USB after a save, the link recovers on its own and state is re-read
+- [x] **WRITE-08**: The active preset can be switched between Vocal, Classic, Bass, USER1 and Off
 - [x] **WRITE-09**: The combined frequency response of a curve (peak, low shelf, high shelf) can be computed for display
 - [x] **WRITE-10**: A pre-gain that offsets the curve's largest boost can be computed automatically, clamped to −12…0 dB
 
@@ -94,14 +94,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LINK-04 | Phase 1 | Complete |
 | LINK-05 | Phase 1 | Complete |
 | LINK-06 | Phase 1 | Complete |
-| WRITE-01 | Phase 2 | Pending |
-| WRITE-02 | Phase 2 | Pending |
+| WRITE-01 | Phase 2 | Complete |
+| WRITE-02 | Phase 2 | Complete |
 | WRITE-03 | Phase 2 | Pending |
-| WRITE-04 | Phase 2 | Pending |
+| WRITE-04 | Phase 2 | Complete |
 | WRITE-05 | Phase 2 | Complete |
-| WRITE-06 | Phase 2 | Pending |
-| WRITE-07 | Phase 2 | Pending |
-| WRITE-08 | Phase 2 | Pending |
+| WRITE-06 | Phase 2 | Complete |
+| WRITE-07 | Phase 2 | Complete |
+| WRITE-08 | Phase 2 | Complete |
 | WRITE-09 | Phase 2 | Complete |
 | WRITE-10 | Phase 2 | Complete |
 | APP-01 | Phase 3 | Pending |
