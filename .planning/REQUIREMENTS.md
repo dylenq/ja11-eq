@@ -88,13 +88,40 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmap) | | |
+| LINK-01 | Phase 1 | Pending |
+| LINK-02 | Phase 1 | Pending |
+| LINK-03 | Phase 1 | Pending |
+| LINK-04 | Phase 1 | Pending |
+| LINK-05 | Phase 1 | Pending |
+| LINK-06 | Phase 1 | Pending |
+| WRITE-01 | Phase 2 | Pending |
+| WRITE-02 | Phase 2 | Pending |
+| WRITE-03 | Phase 2 | Pending |
+| WRITE-04 | Phase 2 | Pending |
+| WRITE-05 | Phase 2 | Pending |
+| WRITE-06 | Phase 2 | Pending |
+| WRITE-07 | Phase 2 | Pending |
+| WRITE-08 | Phase 2 | Pending |
+| WRITE-09 | Phase 2 | Pending |
+| WRITE-10 | Phase 2 | Pending |
+| APP-01 | Phase 3 | Pending |
+| APP-02 | Phase 3 | Pending |
+| APP-03 | Phase 3 | Pending |
+| APP-04 | Phase 3 | Pending |
+| APP-05 | Phase 3 | Pending |
+| APP-06 | Phase 3 | Pending |
+| APP-07 | Phase 3 | Pending |
+| APP-08 | Phase 3 | Pending |
+| APP-09 | Phase 3 | Pending |
+| APP-10 | Phase 3 | Pending |
+| PKG-01 | Phase 4 | Pending |
+| PKG-02 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 28 total
-- Mapped to phases: 0
-- Unmapped: 28 ⚠️
+- Mapped to phases: 28
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-10-10*
-*Last updated: 2026-10-10 after initial definition*
+*Last updated: 2026-10-10 after roadmap creation*
