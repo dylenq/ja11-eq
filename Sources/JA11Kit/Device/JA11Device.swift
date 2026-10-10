@@ -378,6 +378,61 @@ public actor JA11Device {
         return try await readSlot()
     }
 
+    /// Reads USER1's contents and notes the slot that was active (CONTEXT D-13).
+    ///
+    /// With USER1 active this sends no write frame. With another slot active it selects USER1,
+    /// sees that the device switched, reads, and selects the slot that was active again, so taking
+    /// a backup leaves the device as it was found.
+    ///
+    /// Throws `.unexpectedReply` when the active slot is not one this library can name, when the
+    /// device does not switch, and when the state is not five filters of known type: a state that
+    /// cannot be written back exactly is not a usable backup.
+    func captureUser1() async throws -> DeviceBackup {
+        try beginWrite()
+        defer { writeInProgress = false }
+
+        let original = try await readSlot()
+        var originalSlot: PresetSlot?
+        if original != JA11SlotID.user1 {
+            guard let slot = PresetSlot(rawValue: original) else {
+                throw JA11Error.unexpectedReply(
+                    "the active slot is \(original), which is not a known preset; USER1 was not read and nothing was sent."
+                )
+            }
+            originalSlot = slot
+            try await sendWrite(FiioFrame.selectSlot(.user1))
+            let now = try await readSlot()
+            guard now == JA11SlotID.user1 else {
+                throw JA11Error.unexpectedReply("the JA11 did not switch to USER1 (it reports slot \(now)); USER1 was not read.")
+            }
+        }
+
+        let state = try await readState()
+        guard state.slotID == JA11SlotID.user1 else {
+            throw JA11Error.unexpectedReply("USER1 was not the active slot while it was read (slot \(state.slotID)).")
+        }
+        guard let curve = EQCurve(state: state) else {
+            let types = state.bands.map { $0.type?.displayName ?? "type-\($0.typeID)" }.joined(separator: ", ")
+            throw JA11Error.unexpectedReply(
+                "USER1 holds \(state.bands.count) filters (\(types)); a backup needs \(JA11Limits.maxBands) filters of known type."
+            )
+        }
+
+        if let originalSlot {
+            try await sendWrite(FiioFrame.selectSlot(originalSlot))
+            let now = try await readSlot()
+            guard now == original else {
+                throw JA11Error.unexpectedReply(
+                    "the JA11 did not switch back to \(originalSlot.displayName) (it reports slot \(now))."
+                )
+            }
+        }
+
+        // Whole seconds, which is what the backup file holds.
+        let savedAt = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down))
+        return DeviceBackup(savedAt: savedAt, activeSlot: original, curve: curve)
+    }
+
     /// How often the link is looked at while an apply waits for the dongle to come back.
     private static let linkPoll: Duration = .milliseconds(10)
 

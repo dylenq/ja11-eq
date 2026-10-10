@@ -111,9 +111,23 @@ public struct EQCurve: Sendable, Equatable, Codable {
 }
 
 extension EQCurve {
-    /// The built-in test curve.
+    /// The built-in test curve (CONTEXT D-16): pre-gain -6.0 dB, band 0 a low shelf at 100 Hz with
+    /// +6.0 dB and Q 0.70, band 1 a peak at 1000 Hz with -3.0 dB and Q 1.00, and bands 2 to 4 with
+    /// the type, frequency and Q of `original`'s bands 2 to 4 at 0.0 dB. Every band is enabled.
+    ///
+    /// It has a positive gain, a negative gain and a pre-gain other than zero. `original` is
+    /// clamped first, so bands 2 to 4 always exist.
     public static func testCurve(basedOn original: EQCurve) -> EQCurve {
-        original
+        let kept = original.clamped().bands[2...].map { band in
+            EQBand(type: band.type, frequency: band.frequency, gain: 0.0, q: band.q)
+        }
+        return EQCurve(
+            preGain: -6.0,
+            bands: [
+                EQBand(type: .lowShelf, frequency: 100, gain: 6.0, q: 0.70),
+                EQBand(type: .peak, frequency: 1000, gain: -3.0, q: 1.00),
+            ] + kept
+        )
     }
 }
 
