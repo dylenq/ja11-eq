@@ -13,6 +13,11 @@ public final class AppModel {
     public private(set) var sampleRateText: String = missingValueText
     public private(set) var statusLog: [ConnectionStatus] = [.notConnected]
     public private(set) var stateLoadCount: Int = 0
+    /// The curve being edited. Views change it through the `CurveEditor` operations, guarded by
+    /// `editorEnabled`; the type itself ignores edits while it is read-only.
+    public var editor: CurveEditor = .empty
+
+    @ObservationIgnored private var reconnectSeen = true
 
     @ObservationIgnored private let device: JA11Device
     @ObservationIgnored private let sampleRates: any OutputSampleRateSource
@@ -33,6 +38,17 @@ public final class AppModel {
         guard let deviceState else { return missingValueText }
         if let choice = PresetChoice(slotID: deviceState.slotID) { return choice.title }
         return "Unknown (\(deviceState.slotID))"
+    }
+
+    /// True while the dongle is connected and the editor may change.
+    public var editorEnabled: Bool { connection == .connected && editor.isEditable }
+
+    /// A one-line note shown when a loaded slot cannot be edited.
+    public var editorNote: String? {
+        guard let deviceState, PresetChoice(slotID: deviceState.slotID)?.isEditable != true,
+              editor != .empty
+        else { return nil }
+        return "Only Custom can be edited. Choose Custom in the preset picker."
     }
 
     /// Starts following the dongle and the sample rate. Returns at once; safe to call twice.
@@ -73,10 +89,12 @@ public final class AppModel {
             deviceState = state
             readFailure = nil
             stateLoadCount += 1
+            loadEditor(from: state)
         case .readFailed(let error):
             readFailure = error.description
         case .disconnected:
             readFailure = nil
+            reconnectSeen = true
             setConnection(.notConnected)
         case .openFailed(let error):
             if case .accessDenied = error {
@@ -85,6 +103,28 @@ public final class AppModel {
                 setConnection(.notConnected)
             }
         }
+    }
+
+    private func loadEditor(from state: EQState) {
+        guard let curve = EQCurve(state: state) else {
+            editor = .empty
+            readFailure = Self.unshowableReason(state)
+            return
+        }
+        // A dirty editor is only replaced after a genuine reconnect.
+        guard !editor.isDirty || reconnectSeen else { return }
+        editor.load(curve, editable: PresetChoice(slotID: state.slotID)?.isEditable == true)
+        reconnectSeen = false
+    }
+
+    private static func unshowableReason(_ state: EQState) -> String {
+        if state.bands.count != JA11Limits.maxBands {
+            return "The JA11 reports \(state.bands.count) filters instead of \(JA11Limits.maxBands); the editor cannot show it."
+        }
+        if let band = state.bands.first(where: { $0.type == nil }) {
+            return "Filter \(band.index + 1) has an unknown type (\(band.typeID)); the editor cannot show it."
+        }
+        return "The editor cannot show this state."
     }
 
     private func setConnection(_ status: ConnectionStatus) {
