@@ -30,7 +30,7 @@ The real JA11 is plugged into the development Mac, so every success criterion is
   - `Tests/JA11KitTests/` — unit tests that run without the device
 
 ### Protocol codec
-- **D-03:** GET request frame is `BB 0B 00 00 <cmd> <len> <data…> 00 EE`, zero-padded to exactly 20 bytes, sent as HID output report ID `0x02`. Reference GET frames (before padding): slot `BB 0B 00 00 16 00 00 EE`, filter count `BB 0B 00 00 18 00 00 EE`, pre-gain `BB 0B 00 00 17 00 00 EE`, filter N `BB 0B 00 00 15 01 <N> 00 EE`.
+- **D-03:** GET request frame is `BB 0B 00 00 <cmd> <len> <data…> 00 EE`, sent as HID output report ID `0x02`. Primary form: zero-padded to the full 20-byte report length the descriptor declares. Permitted fallback, used only if the dongle does not answer the padded form: the same frame unpadded (8–9 bytes), which is what the reference implementation sends through WebHID on macOS. Both forms are read-only GET requests; no other variation (header, command byte, report ID, extra bytes) is allowed. The form the device answers is the one used from then on. Reference GET frames (before padding): slot `BB 0B 00 00 16 00 00 EE`, filter count `BB 0B 00 00 18 00 00 EE`, pre-gain `BB 0B 00 00 17 00 00 EE`, filter N `BB 0B 00 00 15 01 <N> 00 EE`.
 - **D-04:** This phase implements GET request encoding and reply parsing only. SET (`AA 0A`) encoding is deliberately left to Phase 2, so no code path in Phase 1 can change the DAC.
 - **D-05:** Replies are recognised by header `BB 0B` with the command at byte 4 and data from byte 6. Decoding: slot = byte 6 (`0` Vocal, `1` Classic, `2` Bass, `3` USER1, `4` EQ off); filter count = byte 6; pre-gain = int16 big-endian at bytes 6–7, two's complement, ÷ 10 dB; filter = index at byte 6, gain int16 BE at 7–8 ÷ 10 dB, frequency uint16 BE at 9–10 in Hz, Q uint16 BE at 11–12 ÷ 100, type at byte 13 (`0` peak, `1` low shelf, `2` high shelf).
 - **D-06:** macOS may hand input reports to the callback with or without a leading report-ID byte. The parser must locate the `BB 0B` header at offset 0 or 1 rather than assume one layout, and the layout actually seen on the device is recorded in the phase summary.
@@ -51,7 +51,7 @@ The real JA11 is plugged into the development Mac, so every success criterion is
 - **D-15:** `ja11-probe --raw` additionally prints every frame sent and received as hex, to settle the open device questions.
 
 ### Evidence
-- **D-16:** The phase summary records what the real device showed for the open questions this phase can answer: whether the JA11 replies to GET requests, whether macOS demanded Input Monitoring, and whether input reports carry a leading report-ID byte.
+- **D-16:** The phase summary records what the real device showed for the open questions this phase can answer: whether the JA11 replies to GET requests, which frame form it answered (padded or unpadded, D-03), whether macOS demanded Input Monitoring, and whether input reports carry a leading report-ID byte.
 
 ### Claude's Discretion
 - Concurrency design (run loop vs. dispatch queue for HID callbacks, actor vs. class, how replies are awaited)
