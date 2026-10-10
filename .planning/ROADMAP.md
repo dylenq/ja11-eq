@@ -31,11 +31,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. While the probe has the device open, the dongle's volume and play/pause buttons still control the Mac.
   5. If macOS refuses access to the device, the probe names the permission to grant and where in System Settings to grant it, instead of a bare error.
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 01-01-PLAN.md — Swift package, HID transport and GET codec; `ja11-probe` reads and prints slot, pre-gain and filters from the real dongle
+- [x] 01-01-PLAN.md — Swift package, HID transport and GET codec; `ja11-probe` reads and prints slot, pre-gain and filters from the real dongle
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Failure behaviour and exit statuses, `--watch` across unplug/replug, read-only proof and device evidence
@@ -88,7 +88,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Device Link | 0/TBD | Not started | - |
+| 1. Device Link | 1/2 | In Progress | - |
 | 2. EQ Engine and Write Path | 0/TBD | Not started | - |
 | 3. App UI | 0/TBD | Not started | - |
 | 4. Packaging | 0/TBD | Not started | - |

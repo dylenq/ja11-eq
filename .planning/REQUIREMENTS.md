@@ -9,7 +9,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Device Link
 
-- [ ] **LINK-01**: The JA11 (VID `0x2972`, PID `0x0102`) is found automatically when it is connected, with no manual selection
+- [x] **LINK-01**: The JA11 (VID `0x2972`, PID `0x0102`) is found automatically when it is connected, with no manual selection
 - [ ] **LINK-02**: Connection status follows the dongle being unplugged and plugged back in, without restarting
 - [ ] **LINK-03**: The DAC's active preset slot, pre-gain and all filter settings can be read from the device
 - [ ] **LINK-04**: A `ja11-probe` command prints the DAC's current slot, pre-gain and filters without changing anything on the device
@@ -88,7 +88,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LINK-01 | Phase 1 | Pending |
+| LINK-01 | Phase 1 | Complete |
 | LINK-02 | Phase 1 | Pending |
 | LINK-03 | Phase 1 | Pending |
 | LINK-04 | Phase 1 | Pending |
