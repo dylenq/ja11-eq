@@ -1,10 +1,13 @@
+import Foundation
+
 /// Why a read from, or a write to, the JA11 did not produce a result.
 public enum JA11Error: Error, Equatable, Sendable, CustomStringConvertible {
     /// No JA11 showed up within the discovery timeout.
     case notFound
     /// A read was asked for while no JA11 is connected.
     case notConnected
-    /// A read was asked for while another one is still waiting for its reply.
+    /// A read was asked for while another one is still waiting for its reply, or a write operation
+    /// while another one is under way. Nothing was sent.
     case busy
     /// The device did not answer this request in time.
     case noReply(JA11Command)
@@ -26,7 +29,7 @@ public enum JA11Error: Error, Equatable, Sendable, CustomStringConvertible {
         case .notConnected:
             "The JA11 is not connected."
         case .busy:
-            "Another read is still in progress."
+            "Another operation on the JA11 is still in progress."
         case .noReply(let command):
             "The JA11 did not answer the \(command.displayName) request."
         case .disconnected:
@@ -106,9 +109,10 @@ public enum LinkUpdate: Sendable, Equatable {
 
 /// Reads the JA11's EQ state over a `ReportTransport`, and writes a curve to its USER1 slot.
 ///
-/// Reads build read requests only. The one write operation, `apply(_:)`, takes every frame from a
-/// `FiioFrame` builder, saves to USER1 and to no other slot, and reports success only for a state
-/// read back from the device after the save.
+/// Reads build read requests only. The write operations are internal: `JA11Writer` is the public
+/// way to write, and it takes a backup first. They take every frame from a `FiioFrame` builder,
+/// save to USER1 and to no other slot, run one at a time, and `apply(_:)` reports success only for
+/// a state read back from the device after the save.
 public actor JA11Device {
     /// The request that is waiting for its reply.
     private struct PendingRequest {
@@ -127,6 +131,8 @@ public actor JA11Device {
     private let saveSettle: Duration
     /// How long after the save a read-back may still arrive; the device may drop off USB meanwhile.
     private let reconnectTimeout: Duration
+    /// Wait before the next attempt when the device is not usable yet after a save.
+    private let readBackRetryWait: Duration
     private let trace: (@Sendable (FrameDirection, [UInt8]) -> Void)?
 
     private var started = false
@@ -137,6 +143,8 @@ public actor JA11Device {
 
     /// True from the start of a request until its last attempt has ended, so reads never interleave.
     private var requestInFlight = false
+    /// True for the whole duration of a write operation, so two of them never interleave.
+    private var writeInProgress = false
     private var pending: PendingRequest?
     private var eventTask: Task<Void, Never>?
     private var reportTask: Task<Void, Never>?
@@ -158,6 +166,7 @@ public actor JA11Device {
         framePause: Duration = .milliseconds(100),
         saveSettle: Duration = .milliseconds(1500),
         reconnectTimeout: Duration = .seconds(10),
+        readBackRetryWait: Duration = .milliseconds(200),
         trace: (@Sendable (FrameDirection, [UInt8]) -> Void)? = nil
     ) {
         self.transport = transport
@@ -166,6 +175,7 @@ public actor JA11Device {
         self.framePause = framePause
         self.saveSettle = saveSettle
         self.reconnectTimeout = reconnectTimeout
+        self.readBackRetryWait = readBackRetryWait
         self.trace = trace
     }
 
@@ -285,36 +295,55 @@ public actor JA11Device {
     /// order: pre-gain, filter count 5, filters 0 to 4, save to USER1, select USER1 — and a read of
     /// the whole state. The report is confirmed only when that read equals what was sent.
     ///
-    /// Throws `.writeInterrupted` when the device did not switch to USER1 (nothing was written
-    /// then), and `.noReadBack` when no read completed within the reconnect timeout after the save.
+    /// Before the save nothing is forgiven: a send that fails, a link that is down or a dongle that
+    /// was replugged ends the apply with `.writeInterrupted`, without a save, and no frame is sent
+    /// again. After the save the device may drop off USB; until the reconnect timeout has passed
+    /// the apply waits for it, selects USER1 and reads. `.noReadBack` when no read completed in
+    /// that time. `.busy` when another write operation is under way; nothing is sent then.
     func apply(_ curve: EQCurve) async throws -> ApplyReport {
+        try beginWrite()
+        defer { writeInProgress = false }
+        guard connected else { throw JA11Error.notConnected }
+
         let sent = curve.clamped().deviceState()
+        let epoch = connectionEpoch
 
-        if try await readSlot() != JA11SlotID.user1 {
-            try await sendWrite(FiioFrame.selectSlot(.user1))
-            guard try await readSlot() == JA11SlotID.user1 else {
-                throw JA11Error.writeInterrupted("the JA11 did not switch to USER1; nothing was written.")
-            }
-        }
+        try await makeUser1Active(epoch: epoch)
 
-        try await sendWrite(FiioFrame.setPreGain(sent.preGain))
-        try await sendWrite(FiioFrame.setFilterCount(JA11Limits.maxBands))
+        try await sendValue(FiioFrame.setPreGain(sent.preGain), named: "pre-gain", epoch: epoch)
+        try await sendValue(FiioFrame.setFilterCount(JA11Limits.maxBands), named: "filter count", epoch: epoch)
         for band in sent.bands {
-            try await sendWrite(FiioFrame.setFilter(band))
+            try await sendValue(FiioFrame.setFilter(band), named: "filter \(band.index)", epoch: epoch)
         }
 
+        // A replugged dongle has lost the values sent before the replug; a save now would store a mix.
+        guard connected, connectionEpoch == epoch else {
+            throw JA11Error.writeInterrupted(
+                "the link to the JA11 dropped before the save frame was due; the save was not sent, so nothing was saved."
+            )
+        }
         let clock = ContinuousClock()
         let savedAt = clock.now
         linkLog = (savedAt, [])
         defer { linkLog = nil }
-        try await sendWrite(FiioFrame.saveToUser1())
+        do {
+            try transmit(FiioFrame.saveToUser1())
+        } catch {
+            throw JA11Error.writeInterrupted("the save frame could not be handed to the JA11 (\(error)); the save was not sent.")
+        }
+        try await Task.sleep(for: framePause)
         try await Task.sleep(for: saveSettle)
 
-        // The device may be away for a while after a save. Until the deadline, each attempt
-        // selects USER1 and reads everything; the save itself and the values are never sent again.
+        // The device may be away for a while after a save. Until the deadline, each round waits
+        // for the link, selects USER1 and reads everything. The select frame is the only write
+        // frame that may go out more than once; the values and the save are never sent again.
         let deadline = savedAt + reconnectTimeout
-        var lastFailure = "no attempt was made"
+        var lastFailure = "the JA11 did not come back"
         while clock.now < deadline {
+            guard connected else {
+                try await Task.sleep(for: min(Self.linkPoll, deadline - clock.now))
+                continue
+            }
             do {
                 try await sendWrite(FiioFrame.selectSlot(.user1))
                 let readBack = try await readState()
@@ -325,8 +354,12 @@ public actor JA11Device {
                     linkEvents: linkLog?.events ?? []
                 )
             } catch let error as JA11Error {
+                guard Self.meansNotUsableYet(error) else { throw error }
                 lastFailure = error.description
-                try await Task.sleep(for: max(framePause, .milliseconds(10)))
+            }
+            let remaining = deadline - clock.now
+            if remaining > .zero {
+                try await Task.sleep(for: min(readBackRetryWait, remaining))
             }
         }
         throw JA11Error.noReadBack(
@@ -334,16 +367,90 @@ public actor JA11Device {
         )
     }
 
+    /// Makes `slot` the active preset and returns the slot the device reports afterwards.
+    ///
+    /// One select frame, a pause, one read. Nothing is compared here; the caller does that.
+    /// `.busy` when another write operation is under way; nothing is sent then.
+    func selectSlot(_ slot: PresetSlot) async throws -> UInt8 {
+        try beginWrite()
+        defer { writeInProgress = false }
+        try await sendWrite(FiioFrame.selectSlot(slot))
+        return try await readSlot()
+    }
+
+    /// How often the link is looked at while an apply waits for the dongle to come back.
+    private static let linkPoll: Duration = .milliseconds(10)
+
+    /// Errors that, after a save, mean the device is not usable yet and another round may follow.
+    private static func meansNotUsableYet(_ error: JA11Error) -> Bool {
+        switch error {
+        case .disconnected, .notConnected, .noReply, .busy:
+            true
+        case .transport(.notConnected), .transport(.sendFailed):
+            true
+        default:
+            false
+        }
+    }
+
+    /// Marks the start of a write operation, or refuses when one is under way.
+    private func beginWrite() throws {
+        guard !writeInProgress else { throw JA11Error.busy }
+        writeInProgress = true
+    }
+
+    /// Sees to it that USER1 is the active slot before any value is sent.
+    ///
+    /// The select frame goes out at most once. Any error on the way, and a slot other than USER1
+    /// afterwards, ends the apply with `.writeInterrupted`.
+    private func makeUser1Active(epoch: UInt64) async throws {
+        do {
+            if try await readSlot() == JA11SlotID.user1 { return }
+            try await sendWrite(FiioFrame.selectSlot(.user1))
+            guard try await readSlot() == JA11SlotID.user1, connectionEpoch == epoch else {
+                throw JA11Error.writeInterrupted("the JA11 did not switch to USER1; nothing was written and nothing was saved.")
+            }
+        } catch let error as JA11Error {
+            if case .writeInterrupted = error { throw error }
+            throw JA11Error.writeInterrupted(
+                "USER1 could not be confirmed as the active slot (\(error.description)); no value was written and nothing was saved."
+            )
+        }
+    }
+
+    /// Sends one frame of the part of an apply that comes before the save, then pauses.
+    ///
+    /// Throws `.writeInterrupted` when the link is down, when the dongle is not the one the apply
+    /// began with, or when the send fails. The frame is never sent a second time.
+    private func sendValue(_ frame: [UInt8], named name: String, epoch: UInt64) async throws {
+        guard connected, connectionEpoch == epoch else {
+            throw JA11Error.writeInterrupted(
+                "the link to the JA11 dropped before the \(name) frame was due; it was not sent, and nothing was saved."
+            )
+        }
+        do {
+            try transmit(frame)
+        } catch {
+            throw JA11Error.writeInterrupted("sending the \(name) frame failed (\(error)); nothing was saved.")
+        }
+        try await Task.sleep(for: framePause)
+    }
+
     /// Hands one write frame to the transport, then pauses. Write frames are not answered.
     private func sendWrite(_ frame: [UInt8]) async throws {
         guard connected else { throw JA11Error.notConnected }
+        try transmit(frame)
+        try await Task.sleep(for: framePause)
+    }
+
+    /// Hands one write frame to the transport.
+    private func transmit(_ frame: [UInt8]) throws {
         trace?(.sent, frame)
         do {
             try transport.send(frame)
         } catch let error as HIDTransportError {
             throw JA11Error.transport(error)
         }
-        try await Task.sleep(for: framePause)
     }
 
     // MARK: - Watching

@@ -13,6 +13,8 @@ final class FakeTransport: ReportTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var sentPayloads: [[UInt8]] = []
     private var currentResponder: ([UInt8]) -> [[UInt8]] = { _ in [] }
+    private var failure: HIDTransportError?
+    private var sendsBeforeFailure = 0
 
     init() {
         (events, eventsContinuation) = AsyncStream.makeStream(of: ConnectionEvent.self)
@@ -32,11 +34,30 @@ final class FakeTransport: ReportTransport, @unchecked Sendable {
 
     func start() {}
 
-    func send(_ payload: [UInt8]) throws {
-        let respond = lock.withLock { () -> ([UInt8]) -> [[UInt8]] in
-            sentPayloads.append(payload)
-            return currentResponder
+    /// When set, `send` records the payload and throws this error; nothing is delivered.
+    var sendError: HIDTransportError? {
+        get { lock.withLock { failure } }
+        set { lock.withLock { failure = newValue; sendsBeforeFailure = 0 } }
+    }
+
+    /// Lets `count` more sends through and makes every later one throw `error`.
+    func failSends(with error: HIDTransportError, afterSuccessful count: Int) {
+        lock.withLock {
+            failure = error
+            sendsBeforeFailure = count
         }
+    }
+
+    func send(_ payload: [UInt8]) throws {
+        let (respond, error) = lock.withLock { () -> (([UInt8]) -> [[UInt8]], HIDTransportError?) in
+            sentPayloads.append(payload)
+            if failure != nil, sendsBeforeFailure > 0 {
+                sendsBeforeFailure -= 1
+                return (currentResponder, nil)
+            }
+            return (currentResponder, failure)
+        }
+        if let error { throw error }
         for report in respond(payload) {
             reportsContinuation.yield(report)
         }
