@@ -85,6 +85,11 @@ public actor JA11Device {
     private var eventTask: Task<Void, Never>?
     private var reportTask: Task<Void, Never>?
 
+    /// Counts connects, so a read can tell that the dongle it began with is the one it ended with.
+    private var connectionEpoch: UInt64 = 0
+    /// Where `watch()` receives link changes; nil while nobody is watching.
+    private var watcher: (id: UInt64, continuation: AsyncStream<ConnectionEvent>.Continuation)?
+
     /// The request form the dongle answered; nil until a request was answered.
     public private(set) var frameForm: FrameForm?
 
@@ -185,7 +190,11 @@ public actor JA11Device {
     ///
     /// Each request is answered before the next one is sent. Any error ends the read: the result
     /// is either everything the device reported or nothing.
+    ///
+    /// A dongle that was unplugged and plugged back in while the read was under way ends it with
+    /// `.disconnected`, so values from two connections are never combined into one state.
     public func readState() async throws -> EQState {
+        let epoch = connectionEpoch
         let slotID = try await readSlot()
 
         let count = try await readFilterCount()
@@ -199,14 +208,65 @@ public actor JA11Device {
         for index in 0..<count {
             bands.append(try await readFilter(index: index))
         }
+        guard epoch == connectionEpoch else { throw JA11Error.disconnected }
         return EQState(slotID: slotID, preGain: preGain, bands: bands)
     }
 
     // MARK: - Watching
 
     /// Follows the link: every connect, the state read after it, every disconnect.
+    ///
+    /// The stream starts the transport itself. It first reports the link as it is — for a JA11
+    /// that is already connected, `.connected` and the outcome of a read — and then every change
+    /// in the order it happened. Each connect is followed by a new `readState()`; a state read
+    /// during an earlier connection is never reported again. A failed read is reported and the
+    /// stream goes on. One watcher at a time: a later call ends the stream of the earlier one.
     public nonisolated func watch() -> AsyncStream<LinkUpdate> {
-        AsyncStream { $0.finish() }
+        let (updates, continuation) = AsyncStream.makeStream(of: LinkUpdate.self)
+        let task = Task { await self.runWatch(yieldingTo: continuation) }
+        continuation.onTermination = { _ in task.cancel() }
+        return updates
+    }
+
+    private func runWatch(yieldingTo updates: AsyncStream<LinkUpdate>.Continuation) async {
+        let (links, linkContinuation) = AsyncStream.makeStream(of: ConnectionEvent.self)
+        let id = makeID()
+        watcher?.continuation.finish()
+        watcher = (id, linkContinuation)
+
+        // The link as it is now. Nothing can slip in between this and the registration above,
+        // because the actor handles no event until this method first suspends.
+        if connected {
+            linkContinuation.yield(.connected)
+        } else if let lastOpenError {
+            linkContinuation.yield(.openFailed(lastOpenError))
+        }
+        start()
+
+        // One update at a time, so the reads started here never overlap. While a read waits, the
+        // actor keeps handling events, so an unplug ends that read at once.
+        for await link in links {
+            switch link {
+            case .connected:
+                updates.yield(.connected)
+                do {
+                    updates.yield(.state(try await readState()))
+                } catch JA11Error.disconnected, JA11Error.notConnected {
+                    // The `.disconnected` update that follows covers it.
+                } catch let error as JA11Error {
+                    updates.yield(.readFailed(error))
+                } catch {
+                    updates.yield(.readFailed(.unexpectedReply(String(describing: error))))
+                }
+            case .disconnected:
+                updates.yield(.disconnected)
+            case .openFailed(let error):
+                updates.yield(.openFailed(error))
+            }
+        }
+
+        if watcher?.id == id { watcher = nil }
+        updates.finish()
     }
 
     // MARK: - Requests
@@ -291,9 +351,11 @@ public actor JA11Device {
     // MARK: - Transport input
 
     private func handle(event: ConnectionEvent) {
+        defer { watcher?.continuation.yield(event) }
         switch event {
         case .connected:
             connected = true
+            connectionEpoch += 1
             lastOpenError = nil
             resumeConnectionWaiters(with: .success(()))
         case .disconnected:

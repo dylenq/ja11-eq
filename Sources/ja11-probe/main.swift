@@ -5,9 +5,10 @@ import JA11Kit
 setvbuf(stdout, nil, _IOLBF, 0)
 
 let usage = """
-    usage: ja11-probe [--raw]
+    usage: ja11-probe [--watch] [--raw]
       (no arguments)  read the JA11's preset slot, pre-gain and filters once and print them
-      --raw           also print every frame sent and received as hex
+      --watch         keep running; report disconnect and connect, and read again on each connect
+      --raw          also print every frame sent and received as hex
       --help          show this text
     exit status: 0 state printed, 1 no JA11 found, 2 usage error, 3 access refused by macOS, 4 read failed
     """
@@ -34,6 +35,20 @@ func exitStatus(for error: any Error) -> Int32 {
     }
 }
 
+/// Makes Ctrl-C and SIGTERM end the process with status 0.
+///
+/// The default action is switched off so the dispatch sources are what reacts to the signals.
+/// The sources have to be kept alive by the caller.
+func exitCleanlyOnStopSignals() -> [any DispatchSourceSignal] {
+    [SIGINT, SIGTERM].map { number in
+        signal(number, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: number, queue: .global())
+        source.setEventHandler { exit(ExitStatus.statePrinted) }
+        source.resume()
+        return source
+    }
+}
+
 /// One `tx:` line per frame handed to the transport, one `rx:` line per input report as delivered.
 @Sendable func printFrame(_ direction: FrameDirection, _ bytes: [UInt8]) {
     switch direction {
@@ -46,10 +61,13 @@ func exitStatus(for error: any Error) -> Int32 {
 // `--help` never touches the device.
 var raw = false
 var help = false
+var watching = false
 for argument in CommandLine.arguments.dropFirst() {
     switch argument {
     case "--raw":
         raw = true
+    case "--watch":
+        watching = true
     case "--help":
         help = true
     default:
@@ -64,6 +82,41 @@ if help {
 }
 
 let device = JA11Device(transport: HIDTransport(), trace: raw ? printFrame : nil)
+
+if watching {
+    printError("watching for the JA11 (Ctrl-C to stop)")
+
+    let signalSources = exitCleanlyOnStopSignals()
+
+    // Watch mode waits for a dongle as long as it takes, and every connect is followed by one
+    // read of the state. Nothing else is sent.
+    var formPrinted = false
+    for await update in device.watch() {
+        switch update {
+        case .connected:
+            print("connected")
+        case .state(let state):
+            for line in state.reportLines() {
+                print(line)
+            }
+            if raw, !formPrinted, let form = await device.frameForm {
+                print("info: request frame form: \(form.rawValue)")
+                formPrinted = true
+            }
+        case .disconnected:
+            print("disconnected")
+        case .readFailed(let error):
+            printError("read failed: \(error.description)")
+        case .openFailed(let error):
+            printError(error.description)
+            if case .accessDenied = error {
+                exit(ExitStatus.accessRefused)
+            }
+        }
+    }
+    _ = signalSources
+    exit(ExitStatus.statePrinted)
+}
 
 do {
     await device.start()
