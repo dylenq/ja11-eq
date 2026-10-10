@@ -79,7 +79,18 @@ Plans:
   4. Dragging a band's handle on the graph changes that band's frequency and gain, with its fields and the curve following; pre-gain can be set by hand, or switched to Auto, where it follows the curve.
   5. Pressing Apply sends the curve to the DAC and the window shows whether the read-back confirmed it — the whole edit → apply → read-back loop works from the GUI alone.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+- [ ] 03-01-PLAN.md — App shell and tracer: JA11EQ executable over a testable JA11EQCore library, live device header (connection, preset, sample rate)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03-02-PLAN.md — Editor and graph: CurveEditor (clamping, dirty, Auto pre-gain), GraphGeometry, band rows, pre-gain, draggable handles
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 03-03-PLAN.md — Apply state machine, preset picker, Revert, Restore original, operation serialisation, end-of-phase human-check script
+
 **UI hint**: yes
 
 ### Phase 4: Packaging
@@ -103,5 +114,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Device Link | 2/2 | Complete    | 2026-10-10 |
 | 2. EQ Engine and Write Path | 4/4 | In Progress | - |
-| 3. App UI | 0/TBD | Not started | - |
+| 3. App UI | 0/3 | Planned | - |
 | 4. Packaging | 0/TBD | Not started | - |
