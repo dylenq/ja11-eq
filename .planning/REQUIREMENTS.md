@@ -20,7 +20,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **WRITE-01**: A 5-band curve plus pre-gain can be written to the DAC's USER1 slot and made the active preset
 - [x] **WRITE-02**: After a write, the device is read back and any mismatch with what was sent is reported
-- [ ] **WRITE-03**: A written curve is still on the DAC after it is unplugged and plugged back in
+- [x] **WRITE-03**: A written curve is still on the DAC after it is unplugged and plugged back in
 - [x] **WRITE-04**: Factory presets (Vocal, Classic, Bass) are never modified — only slot 3 is ever written
 - [x] **WRITE-05**: Every value is clamped to device limits (5 bands, gain ±12 dB, Q 0.1–10, pre-gain ±12 dB, 20 Hz–20 kHz) before it is sent
 - [x] **WRITE-06**: The DAC's original USER1 contents are saved to a file before the first write, and can be restored from it
@@ -96,7 +96,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LINK-06 | Phase 1 | Complete |
 | WRITE-01 | Phase 2 | Complete |
 | WRITE-02 | Phase 2 | Complete |
-| WRITE-03 | Phase 2 | Pending |
+| WRITE-03 | Phase 2 | Complete |
 | WRITE-04 | Phase 2 | Complete |
 | WRITE-05 | Phase 2 | Complete |
 | WRITE-06 | Phase 2 | Complete |

@@ -1,8 +1,8 @@
 ---
 phase: 02-eq-engine-and-write-path
 verified: 2026-10-10T20:00:00Z
-status: human_needed
-score: 8/10 must-haves verified
+status: passed
+score: 10/10 must-haves verified
 covered_files:
   - Sources/JA11Kit/Backup/BackupStore.swift
   - Sources/JA11Kit/DSP/EQResponse.swift
@@ -115,3 +115,14 @@ No gaps. The phase is code-complete and device-tested. It becomes passed once th
 
 _Verified: 2026-10-10_
 _Verifier: Claude (gsd-verifier)_
+
+## Human Verification Results (2026-10-11)
+
+Performed by the user from Terminal.app on the real JA11; results reported in the main session.
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | Test curve audible (WRITE-01) | Passed — user heard the bass lift. The on-board EQ is therefore active at the Mac's current output rate. |
+| 2 | Curve persists across unplug/replug (WRITE-03) | Passed — user reported the curve was kept after replugging. |
+
+Status changed from `human_needed` to `passed` on this basis.
