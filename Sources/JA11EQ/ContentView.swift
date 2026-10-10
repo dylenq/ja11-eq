@@ -9,8 +9,9 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 16) {
             header
             Divider()
-            filterList
-            Spacer(minLength: 0)
+            GraphView(model: model)
+                .frame(maxHeight: .infinity)
+            EditorPanelView(model: model)
         }
         .padding(20)
     }
@@ -31,19 +32,6 @@ struct ContentView: View {
             Text("Sample rate: \(model.sampleRateText)")
             if let failure = model.readFailure {
                 Text(failure).foregroundStyle(.red)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var filterList: some View {
-        if let state = model.deviceState {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Pre-gain: \(String(format: "%.1f", state.preGain)) dB")
-                ForEach(state.bands, id: \.index) { band in
-                    Text("\(band.index + 1). \(band.type?.displayName ?? "type-\(band.typeID)")  \(band.frequency) Hz  \(String(format: "%+.1f", band.gain)) dB  Q \(String(format: "%.2f", band.q))")
-                        .monospacedDigit()
-                }
             }
         }
     }
