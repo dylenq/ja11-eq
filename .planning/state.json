@@ -1,0 +1,33 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "1",
+      "name": "Device Link",
+      "status": "complete"
+    },
+    {
+      "number": "2",
+      "name": "EQ Engine and Write Path",
+      "status": "in_progress"
+    },
+    {
+      "number": "3",
+      "name": "App UI",
+      "status": "in_progress"
+    },
+    {
+      "number": "4",
+      "name": "Packaging",
+      "status": "complete"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step (plan phase 2)",
+    "reason": "Phase 2 of 4 — needs a plan"
+  },
+  "updated_at": "2026-10-11T02:38:05.261Z"
+}
