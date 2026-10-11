@@ -71,5 +71,8 @@
   "granularity": "coarse",
   "planner": {
     "stall_detection_enabled": false
+  },
+  "graphify": {
+    "enabled": true
   }
 }
